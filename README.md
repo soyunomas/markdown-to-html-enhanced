@@ -14,7 +14,7 @@
 
 *   **Demo Online (Recomendado para una prueba rápida)**
   
-    [![Demo Online](https://img.shields.io/badge/Probar_en_Vivo-GitHub_Pages-brightgreen?style=for-the-badge&logo=githubpages)](https://Soyunomas.github.io/NOMBRE_DEL_REPOSITORIO/Markdown_to_html.html)
+    [![Demo Online](https://img.shields.io/badge/Probar_en_Vivo-GitHub_Pages-brightgreen?style=for-the-badge&logo=githubpages)](https://Soyunomas.github.io/markdown-to-html-enhanced/Markdown_to_html.html)
 
 
 ## 🖼️ Vistazo Rápido
@@ -30,7 +30,7 @@
   </tr>
 </table>
 
-✨ **[Ver un documento de ejemplo generado con esta herramienta](TU_ENLACE_AL_HTML_DE_EJEMPLO_AQUI.html)** ✨
+✨ **[Ver un documento de ejemplo generado con esta herramienta](https://Soyunomas.github.io/markdown-to-html-enhanced/example.html)** ✨
 
 ## ✨ Características Principales
 
