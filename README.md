@@ -103,3 +103,11 @@
 *   **Número de Línea en Textarea:** Opcional.
 
 ---
+
+## 📜 Licencia
+
+Este proyecto está bajo la Licencia MIT. Consulta el archivo `LICENSE` para más detalles.
+
+Copyright (c) 2025 Soyunomas.
+
+---
