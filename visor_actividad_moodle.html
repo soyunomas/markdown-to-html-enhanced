@@ -1,0 +1,3055 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor de Actividad Moodle</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.23.0/esm/index.js" type="module"></script> 
+
+    <style>
+        body {
+            padding-top: 56px; 
+            background-color: #f8f9fa;
+        }
+        .chart-container-modal { 
+            position: relative;
+            margin: auto;
+            height: 85vh; 
+            width: 100%;
+        }
+        .chart-card .card-body canvas {
+            min-height: 220px; 
+            max-height: 250px;
+            width: 100%;
+        }
+        .chart-card {
+            cursor: pointer; 
+        }
+        .chart-card:hover {
+            border-color: #0d6efd; 
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        #resultsSection.hidden,
+        #loadingIndicator.hidden {
+            display: none;
+        }
+        .sticky-controls {
+            position: sticky;
+            top: 56px; 
+            background-color: #ffffff; 
+            z-index: 999; 
+        }
+        .sticky-controls .card { 
+             border-bottom: 1px solid #dee2e6;
+             box-shadow: 0 2px 4px rgba(0,0,0,.1);
+             margin-bottom: 1.5rem; 
+        }
+
+        .filters-scroll-area {
+            max-height: 30vh;
+            overflow-y: auto; 
+            padding-right: 5px; 
+            margin-top: 0.5rem; 
+        }
+        .filter-group {
+            border-left: 3px solid #0d6efd;
+            padding-left: 0.75rem;
+        }
+        .table-responsive {
+            max-height: 500px; 
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        .card-header h2, .card-header h3 { 
+            font-size: 0.90rem;
+            font-weight: 600;
+        }
+        .navbar {
+            z-index: 1050; 
+        }
+        .navbar-nav .nav-link {
+            padding-right: .5rem;
+            padding-left: .5rem;
+        }
+        .modal-fullscreen .modal-body {
+            overflow-y: auto;
+        }
+        #dashboardGeneralStats p {
+            font-size: 0.8rem; 
+            margin-bottom: 0.3rem !important;
+        }
+        #dashboardGeneralStats .badge {
+            font-size: 0.75rem;
+        }
+        .stat-label {
+            color: #6c757d; 
+        }
+        .accordion-button:not(.collapsed) {
+            color: #0c63e4; 
+            background-color: #e7f1ff; 
+        }
+        .accordion-button:focus {
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, .25); 
+        }
+        #ipFilter[multiple] {
+            min-height: 70px; 
+        }
+        /* Ajuste para etiquetas de filtro en móviles */
+        @media (max-width: 767.98px) {
+            .filters-scroll-area .form-label {
+                font-size: 0.85rem;
+            }
+            .form-check-label {
+                font-size: 0.85rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">Visor Moodle</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                     <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#settingsModal" title="Configuración">
+                            <i class="bi bi-gear-fill"></i>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-md-4 pt-4">
+        <header class="text-center mb-4">
+            <h3 class="fw-light">Visor de Actividad Moodle</h3>
+        </header>
+
+        <div class="sticky-controls">
+            <div class="card">
+                <div class="accordion" id="analysisControlsAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="controlsAccordionHeader">
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseControls" aria-expanded="true" aria-controls="collapseControls">
+                                Configuración de Análisis y Filtros
+                            </button>
+                        </h2>
+                        <div id="collapseControls" class="accordion-collapse collapse show" aria-labelledby="controlsAccordionHeader" data-bs-parent="#analysisControlsAccordion">
+                            <div class="accordion-body">
+                                <div class="row g-3 align-items-end">
+                                    <div class="col-md-12 mb-3">
+                                        <label for="csvFile" class="form-label fw-bold">1. Selecciona el archivo CSV:</label>
+                                        <input class="form-control" type="file" id="csvFile" accept=".csv">
+                                    </div>
+                                    
+                                    <div class="col-md-12 filter-group mb-3">
+                                        <p class="form-label fw-bold mb-1">2. Filtros de Análisis:</p>
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" role="switch" id="includeZeroActivitySwitch">
+                                            <label class="form-check-label" for="includeZeroActivitySwitch">Incluir ítems con 0 actividad en rankings</label>
+                                        </div>
+                                        <div class="filters-scroll-area">
+                                            <div class="row g-2">
+                                                <div class="col-md-4 col-lg-2">
+                                                    <label for="startDate" class="form-label">Fecha Inicio:</label>
+                                                    <input type="date" class="form-control form-control-sm" id="startDate">
+                                                </div>
+                                                <div class="col-md-4 col-lg-2">
+                                                    <label for="endDate" class="form-label">Fecha Fin:</label>
+                                                    <input type="date" class="form-control form-control-sm" id="endDate">
+                                                </div>
+                                                <div class="col-md-4 col-lg-2">
+                                                    <label for="startTimeFilter" class="form-label">Hora Inicio:</label>
+                                                    <input type="time" class="form-control form-control-sm" id="startTimeFilter" value="00:00">
+                                                </div>
+                                                <div class="col-md-4 col-lg-2">
+                                                    <label for="endTimeFilter" class="form-label">Hora Fin:</label>
+                                                    <input type="time" class="form-control form-control-sm" id="endTimeFilter" value="23:59">
+                                                </div>
+                                                <div class="col-md-4 col-lg-2">
+                                                    <label for="userFilter" class="form-label">Alumno:</label>
+                                                    <select id="userFilter" class="form-select form-select-sm">
+                                                        <option value="ALL_USERS">Todos los Alumnos</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-4 col-lg-2">
+                                                    <label for="eventFilter" class="form-label">Nombre Evento:</label>
+                                                    <select id="eventFilter" class="form-select form-select-sm">
+                                                        <option value="ALL_EVENTS">Todos los Eventos</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="row g-2 mt-2">
+                                                <div class="col-md-4">
+                                                    <label for="componentFilter" class="form-label">Componente:</label>
+                                                    <select id="componentFilter" class="form-select form-select-sm">
+                                                        <option value="ALL_COMPONENTS">Todos los Componentes</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label for="contextFilter" class="form-label">Contexto Evento:</label>
+                                                    <select id="contextFilter" class="form-select form-select-sm">
+                                                        <option value="ALL_CONTEXTS">Todos los Contextos</option>
+                                                    </select>
+                                                </div>
+                                                 <div class="col-md-4">
+                                                    <label for="ipFilter" class="form-label">Dirección IP:</label>
+                                                    <select id="ipFilter" class="form-select form-select-sm" multiple size="3">
+                                                    </select>
+                                                    <div class="form-text" id="ipFilterHelp">Seleccione una o más IPs. Ninguna selección implica todas.</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-12 d-grid">
+                                        <button id="analyzeButton" class="btn btn-primary btn-lg">Analizar Logs</button>
+                                    </div>
+                                </div>
+                                <div id="statusMessage" class="mt-3 pt-2 border-top"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="loadingIndicator" class="text-center my-5 hidden">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+            <p class="mt-2">Procesando datos...</p>
+        </div>
+        
+        <main id="resultsSection" class="hidden">
+            <div class="container-fluid px-0"> 
+                <div class="row mb-3 g-3">
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header"><h3 class="h6 mb-0">Estadísticas Generales</h3></div>
+                            <div class="card-body" id="dashboardGeneralStats">
+                                <p><span class="stat-label">Rango Fechas:</span> <span id="dashDateRange" class="fw-bold">N/A</span></p>
+                                <p><span class="stat-label">Total Eventos:</span> <span id="dashTotalEvents" class="badge bg-primary">N/A</span></p>
+                                <p><span class="stat-label">Usuarios Únicos:</span> <span id="dashUniqueUsers" class="badge bg-info">N/A</span></p>
+                                <p><span class="stat-label">Días con Actividad:</span> <span id="dashActiveDays" class="badge bg-success">N/A</span></p>
+                                <p><span class="stat-label">Promedio Eventos/Día:</span> <span id="dashAvgEventsPerDay" class="badge bg-warning text-dark">N/A</span></p>
+                                <p><span class="stat-label">Evento Más Frecuente:</span> <span id="dashMostFrequentEventName" class="badge bg-secondary text-truncate d-block" style="max-width: 100%;">N/A</span></p>
+                                <p><span class="stat-label">Componente Más Accedido:</span> <span id="dashMostFrequentComponent" class="badge bg-secondary text-truncate d-block" style="max-width: 100%;">N/A</span></p>
+                                <p class="mb-0"><span class="stat-label">Usuario Más Activo:</span> <span id="dashMostActiveUser" class="badge bg-dark text-truncate d-block" style="max-width: 100%;">N/A</span></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card h-100 chart-card" data-modal-target="#userActivityModal" data-chart-type="userActivity">
+                            <div class="card-header"><h3 class="h6 mb-0">Actividad por Alumno (Top 15)</h3></div>
+                            <div class="card-body">
+                                <canvas id="dashUserActivityChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card h-100 chart-card" data-modal-target="#eventsOverTimeModal" data-chart-type="eventsOverTime">
+                            <div class="card-header"><h3 class="h6 mb-0">Eventos por Día</h3></div>
+                            <div class="card-body">
+                                <canvas id="dashEventsOverTimeChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card h-100 chart-card" data-modal-target="#componentActivityModal" data-chart-type="componentActivity">
+                            <div class="card-header"><h3 class="h6 mb-0">Actividad por Componente (Top 10)</h3></div>
+                            <div class="card-body">
+                                <canvas id="dashComponentActivityChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mb-3 g-3">
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card h-100 chart-card" data-modal-target="#activityByHourModal" data-chart-type="activityByHour">
+                            <div class="card-header"><h3 class="h6 mb-0">Eventos por Hora del Día</h3></div>
+                            <div class="card-body">
+                                <canvas id="dashActivityByHourChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card h-100 chart-card" data-modal-target="#activityByDayOfWeekModal" data-chart-type="activityByDayOfWeek">
+                            <div class="card-header"><h3 class="h6 mb-0">Eventos por Día de Semana</h3></div>
+                            <div class="card-body">
+                                <canvas id="dashActivityByDayOfWeekChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card h-100 chart-card" data-modal-target="#componentBreakdownModal" data-chart-type="componentBreakdown">
+                            <div class="card-header"><h3 class="h6 mb-0">Desglose Eventos en Componentes</h3></div>
+                            <div class="card-body">
+                                <canvas id="dashComponentBreakdownChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                     <div class="col-xl-3 col-md-6">
+                        <div class="card h-100 chart-card" data-modal-target="#activityByContextModal" data-chart-type="activityByContext">
+                            <div class="card-header"><h3 class="h6 mb-0">Actividad por Contexto (Top 10)</h3></div>
+                            <div class="card-body">
+                                <canvas id="dashActivityByContextChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-3 g-3">
+                    <div class="col-xl-4 col-md-6">
+                        <div class="card h-100 chart-card" data-modal-target="#scatterUsersEventsDayModal" data-chart-type="scatterUsersEventsDay">
+                            <div class="card-header"><h3 class="h6 mb-0">Usuarios Únicos vs Eventos (por Día)</h3></div>
+                            <div class="card-body">
+                                <canvas id="dashScatterUsersEventsDayChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-4 col-md-6">
+                        <div class="card h-100 chart-card" data-modal-target="#scatterComponentsEventsUserModal" data-chart-type="scatterComponentsEventsUser">
+                            <div class="card-header"><h3 class="h6 mb-0">Componentes Únicos vs Eventos (por Alumno)</h3></div>
+                            <div class="card-body">
+                                <canvas id="dashScatterComponentsEventsUserChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-4 col-md-6">
+                        <div class="card h-100 chart-card" data-modal-target="#scatterContentViewParticipationModal" data-chart-type="scatterContentViewParticipation">
+                            <div class="card-header"><h3 class="h6 mb-0">Visualización vs Participación (por Alumno)</h3></div>
+                            <div class="card-body">
+                                <canvas id="dashScatterContentViewParticipationChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-3 g-3">
+                    <div class="col-xl-4 col-md-6">
+                        <div class="card h-100 chart-card" data-modal-target="#bubbleStudentAnalysisModal" data-chart-type="bubbleStudentAnalysis">
+                            <div class="card-header"><h3 class="h6 mb-0">Análisis Alumnos (Días Act./ØEvtDia/TotalEvt)</h3></div>
+                            <div class="card-body">
+                                <canvas id="dashBubbleStudentAnalysisChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-4 col-md-6">
+                        <div class="card h-100 chart-card" data-modal-target="#bubbleComponentAnalysisModal" data-chart-type="bubbleComponentAnalysis">
+                            <div class="card-header"><h3 class="h6 mb-0">Análisis Componentes (UsrUnicos/TotalEvt/ØEvtUsr)</h3></div>
+                            <div class="card-body">
+                                <canvas id="dashBubbleComponentAnalysisChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-4 col-md-6">
+                        <div class="card h-100 chart-card" data-modal-target="#bubbleContextAnalysisModal" data-chart-type="bubbleContextAnalysis">
+                            <div class="card-header"><h3 class="h6 mb-0">Análisis Contextos (AluAct/ØEvtAlu/TotalEvt)</h3></div>
+                            <div class="card-body">
+                                <canvas id="dashBubbleContextAnalysisChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-3 g-3">
+                    <div class="col-xl-4 col-md-6">
+                        <div class="card h-100 chart-card" data-modal-target="#topIPsByEventsModal" data-chart-type="topIPsByEvents">
+                            <div class="card-header"><h3 class="h6 mb-0">Top IPs por N° Eventos (Top 10)</h3></div>
+                            <div class="card-body">
+                                <canvas id="dashTopIPsByEventsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-4 col-md-6">
+                        <div class="card h-100 chart-card" data-modal-target="#usersPerIPModal" data-chart-type="usersPerIP">
+                            <div class="card-header"><h3 class="h6 mb-0">Top IPs por N° Alumnos (Top 10)</h3></div>
+                            <div class="card-body">
+                                <canvas id="dashUsersPerIPChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-4 col-md-6">
+                        <div class="card h-100 chart-card" data-modal-target="#ipsPerUserModal" data-chart-type="ipsPerUser">
+                            <div class="card-header"><h3 class="h6 mb-0">Top Alumnos por N° IPs (Top 10)</h3></div>
+                            <div class="card-body">
+                                <canvas id="dashIPsPerUserChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <section id="logTableSection" class="mt-4 card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                     <h2 class="h5 mb-0">Detalle de Logs Filtrados</h2>
+                     <button id="downloadLogsCsvButton" class="btn btn-sm btn-outline-primary" title="Descargar Logs Filtrados (CSV)">
+                         <i class="bi bi-download"></i> Descargar CSV
+                     </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Hora</th>
+                                    <th>Nombre completo del usuario</th>
+                                    <th>Contexto del evento</th>
+                                    <th>Componente</th>
+                                    <th>Nombre evento</th>
+                                    <th>Descripción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                     <p id="tableRowCount" class="mt-2 text-muted small"></p>
+                </div>
+            </section>
+        </main>
+
+        <footer class="text-center mt-5 text-muted">
+            <p>&copy; <span id="currentYear"></span> Visor de Actividad Moodle.</p>
+        </footer>
+    </div>
+
+    <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="settingsModalLabel">Configuración de Exclusiones y Patrones</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>Exclusiones Globales</h6>
+                    <p class="form-text">Los elementos que contengan cualquiera de estas subcadenas (separadas por coma, insensible a mayúsculas/minúsculas) serán excluidos de todos los análisis, gráficos y listados.</p>
+                    <div class="mb-3">
+                        <label for="excludedUsernamesTextarea" class="form-label">Excluir Alumnos por nombre:</label>
+                        <textarea class="form-control" id="excludedUsernamesTextarea" rows="2" placeholder="Ej: Fernández, Jose, Admin User"></textarea>
+                    </div>
+                     <div class="mb-3">
+                        <label for="excludedComponentsTextarea" class="form-label">Excluir Componentes por nombre:</label>
+                        <textarea class="form-control" id="excludedComponentsTextarea" rows="2" placeholder="Ej: Sistema, Foro, Tarea"></textarea>
+                    </div>
+                     <div class="mb-3">
+                        <label for="excludedEventNamesTextarea" class="form-label">Excluir Nombres de Evento:</label>
+                        <textarea class="form-control" id="excludedEventNamesTextarea" rows="2" placeholder="Ej: course viewed, user loggedin, some_internal_event"></textarea>
+                    </div>
+                     <div class="mb-3">
+                        <label for="excludedContextsTextarea" class="form-label">Excluir Contextos de Evento:</label>
+                        <textarea class="form-control" id="excludedContextsTextarea" rows="2" placeholder="Ej: Curso Principal, Categoría X, Actividad Y"></textarea>
+                    </div>
+                    
+                    <hr class="my-4">
+                    <h6>Patrones para Gráfico 'Visualización vs Participación'</h6>
+                     <div class="mb-3">
+                        <label for="viewEventPatternsTextarea" class="form-label">Patrones Eventos de Visualización (subcadenas, separadas por coma):</label>
+                        <textarea class="form-control" id="viewEventPatternsTextarea" rows="2" placeholder="Ej: viewed, consultado, vista"></textarea>
+                        <div class="form-text">Usado para el gráfico 'Visualización vs Participación'. Sensible a mayúsculas/minúsculas si no se pre-procesa globalmente.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="participationEventPatternsTextarea" class="form-label">Patrones Eventos de Participación (subcadenas, separadas por coma):</label>
+                        <textarea class="form-control" id="participationEventPatternsTextarea" rows="2" placeholder="Ej: submitted, posted, answered, participado"></textarea>
+                        <div class="form-text">Usado para el gráfico 'Visualización vs Participación'. Un evento se cuenta como participación si coincide aquí Y NO en visualización.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-primary" id="saveSettingsButton">Guardar Cambios y Reanalizar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="userActivityModal" tabindex="-1" aria-labelledby="userActivityModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="userActivityModalLabel">Actividad por Alumno (Detallado)</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2 download-chart-csv-button" data-chart-type="userActivity" title="Descargar datos del gráfico (CSV)">
+                            <i class="bi bi-download"></i> CSV
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="chart-container-modal">
+                        <canvas id="activityByUserChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="componentActivityModal" tabindex="-1" aria-labelledby="componentActivityModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="componentActivityModalLabel">Actividad por Componente (Detallado)</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2 download-chart-csv-button" data-chart-type="componentActivity" title="Descargar datos del gráfico (CSV)">
+                            <i class="bi bi-download"></i> CSV
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="chart-container-modal">
+                        <canvas id="activityByComponentChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="eventsOverTimeModal" tabindex="-1" aria-labelledby="eventsOverTimeModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="eventsOverTimeModalLabel">Eventos por Día (Detallado)</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2 download-chart-csv-button" data-chart-type="eventsOverTime" title="Descargar datos del gráfico (CSV)">
+                            <i class="bi bi-download"></i> CSV
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="chart-container-modal">
+                        <canvas id="eventsOverTimeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="activityByHourModal" tabindex="-1" aria-labelledby="activityByHourModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="activityByHourModalLabel">Eventos por Hora del Día (Detallado)</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2 download-chart-csv-button" data-chart-type="activityByHour" title="Descargar datos del gráfico (CSV)">
+                            <i class="bi bi-download"></i> CSV
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="chart-container-modal">
+                        <canvas id="activityByHourChartModal"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="activityByDayOfWeekModal" tabindex="-1" aria-labelledby="activityByDayOfWeekModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="activityByDayOfWeekModalLabel">Eventos por Día de la Semana (Detallado)</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2 download-chart-csv-button" data-chart-type="activityByDayOfWeek" title="Descargar datos del gráfico (CSV)">
+                            <i class="bi bi-download"></i> CSV
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="chart-container-modal">
+                        <canvas id="activityByDayOfWeekChartModal"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal fade" id="componentBreakdownModal" tabindex="-1" aria-labelledby="componentBreakdownModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="componentBreakdownModalLabel">Desglose de Eventos en Componentes Principales (Detallado)</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2 download-chart-csv-button" data-chart-type="componentBreakdown" title="Descargar datos del gráfico (CSV)">
+                            <i class="bi bi-download"></i> CSV
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="chart-container-modal">
+                        <canvas id="componentBreakdownChartModal"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="activityByContextModal" tabindex="-1" aria-labelledby="activityByContextModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="activityByContextModalLabel">Actividad por Contexto de Evento (Detallado)</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2 download-chart-csv-button" data-chart-type="activityByContext" title="Descargar datos del gráfico (CSV)">
+                            <i class="bi bi-download"></i> CSV
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="chart-container-modal">
+                        <canvas id="activityByContextChartModal"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="scatterUsersEventsDayModal" tabindex="-1" aria-labelledby="scatterUsersEventsDayModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="scatterUsersEventsDayModalLabel">Dispersión: Usuarios Únicos vs Eventos Totales (por Día)</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2 download-chart-csv-button" data-chart-type="scatterUsersEventsDay" title="Descargar datos del gráfico (CSV)">
+                            <i class="bi bi-download"></i> CSV
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="chart-container-modal">
+                        <canvas id="scatterUsersEventsDayModalCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="scatterComponentsEventsUserModal" tabindex="-1" aria-labelledby="scatterComponentsEventsUserModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="scatterComponentsEventsUserModalLabel">Dispersión: Componentes Únicos vs Eventos Totales (por Alumno)</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2 download-chart-csv-button" data-chart-type="scatterComponentsEventsUser" title="Descargar datos del gráfico (CSV)">
+                            <i class="bi bi-download"></i> CSV
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="chart-container-modal">
+                        <canvas id="scatterComponentsEventsUserModalCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="scatterContentViewParticipationModal" tabindex="-1" aria-labelledby="scatterContentViewParticipationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="scatterContentViewParticipationModalLabel">Dispersión: Eventos de Visualización vs Participación (por Alumno)</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2 download-chart-csv-button" data-chart-type="scatterContentViewParticipation" title="Descargar datos del gráfico (CSV)">
+                            <i class="bi bi-download"></i> CSV
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="chart-container-modal">
+                        <canvas id="scatterContentViewParticipationModalCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="bubbleStudentAnalysisModal" tabindex="-1" aria-labelledby="bubbleStudentAnalysisModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="bubbleStudentAnalysisModalLabel">Burbujas: Análisis de Alumnos</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2 download-chart-csv-button" data-chart-type="bubbleStudentAnalysis" title="Descargar datos del gráfico (CSV)">
+                            <i class="bi bi-download"></i> CSV
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="chart-container-modal">
+                        <canvas id="bubbleStudentAnalysisModalCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="bubbleComponentAnalysisModal" tabindex="-1" aria-labelledby="bubbleComponentAnalysisModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="bubbleComponentAnalysisModalLabel">Burbujas: Análisis de Componentes</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2 download-chart-csv-button" data-chart-type="bubbleComponentAnalysis" title="Descargar datos del gráfico (CSV)">
+                            <i class="bi bi-download"></i> CSV
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="chart-container-modal">
+                        <canvas id="bubbleComponentAnalysisModalCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="bubbleContextAnalysisModal" tabindex="-1" aria-labelledby="bubbleContextAnalysisModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="bubbleContextAnalysisModalLabel">Burbujas: Análisis de Contextos</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2 download-chart-csv-button" data-chart-type="bubbleContextAnalysis" title="Descargar datos del gráfico (CSV)">
+                            <i class="bi bi-download"></i> CSV
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="chart-container-modal">
+                        <canvas id="bubbleContextAnalysisModalCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="topIPsByEventsModal" tabindex="-1" aria-labelledby="topIPsByEventsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="topIPsByEventsModalLabel">Top IPs por Número de Eventos (Detallado)</h5>
+                     <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2 download-chart-csv-button" data-chart-type="topIPsByEvents" title="Descargar datos del gráfico (CSV)">
+                            <i class="bi bi-download"></i> CSV
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="chart-container-modal">
+                        <canvas id="topIPsByEventsModalCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="usersPerIPModal" tabindex="-1" aria-labelledby="usersPerIPModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="usersPerIPModalLabel">Top IPs por Número de Alumnos Únicos (Detallado)</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2 download-chart-csv-button" data-chart-type="usersPerIP" title="Descargar datos del gráfico (CSV)">
+                            <i class="bi bi-download"></i> CSV
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="chart-container-modal">
+                        <canvas id="usersPerIPModalCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="ipsPerUserModal" tabindex="-1" aria-labelledby="ipsPerUserModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="ipsPerUserModalLabel">Top Alumnos por Número de IPs Únicas (Detallado)</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2 download-chart-csv-button" data-chart-type="ipsPerUser" title="Descargar datos del gráfico (CSV)">
+                            <i class="bi bi-download"></i> CSV
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="chart-container-modal">
+                        <canvas id="ipsPerUserModalCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+    <script>
+        // --- GLOBAL VARIABLES ---
+        let parsedDataCache = []; 
+        let globallyProcessedDataForBaseLists = [];
+        let filteredDataForCharts = [];
+        let areFiltersPopulated = false;
+        let ipColumnAvailable = false;
+        let includeZeroActivity = false;
+        
+        let excludedUserSubstrings = []; 
+        let excludedComponentSubstrings = [];
+        let excludedEventNameSubstrings = [];
+        let excludedContextSubstrings = [];
+        
+        let VIEW_EVENT_PATTERNS = ["viewed", "view", "visto", "consulta", "course module viewed", "page viewed", "resource viewed", "url viewed", "book viewed", "lesson viewed", "folder viewed", "glossary entry viewed"];
+        let PARTICIPATION_EVENT_PATTERNS = ["post created", "submitted", "attempt", "answered", "replied", "updated", "created", "participated", "added", "deleted", "enviado", "intento", "respondido", "actualizado", "creado", "participado", "añadido", "eliminado", "publicado", "forum discussion created", "quiz attempt submitted", "assignment submitted", "choice made", "feedback completed", "workshop assessment evaluated", "database record created", "wiki page created"];
+
+        let dashUserActivityChartInstance = null;
+        let dashEventsOverTimeChartInstance = null;
+        let dashComponentActivityChartInstance = null;
+        let dashActivityByHourChartInstance = null;
+        let dashActivityByDayOfWeekChartInstance = null;
+        let dashComponentBreakdownChartInstance = null;
+        let dashActivityByContextChartInstance = null;
+        let dashScatterUsersEventsDayInstance = null;
+        let dashScatterComponentsEventsUserInstance = null;
+        let dashScatterContentViewParticipationInstance = null;
+        let dashBubbleStudentAnalysisInstance = null;
+        let dashBubbleComponentAnalysisInstance = null;
+        let dashBubbleContextAnalysisInstance = null;
+        let dashTopIPsByEventsInstance = null;
+        let dashUsersPerIPInstance = null;
+        let dashIPsPerUserInstance = null;
+        
+        let modalChartInstance = null; 
+
+        const CSV_COLUMN_MAPPING = {
+            TIME: "Hora",
+            FULL_NAME: "Nombre completo del usuario",
+            AFFECTED_USER: "Usuario afectado", 
+            EVENT_CONTEXT: "Contexto del evento",
+            COMPONENT: "Componente",
+            EVENT_NAME: "Nombre evento",
+            DESCRIPTION: "Descripción",
+            ORIGIN: "Origen",
+            IP_ADDRESS: "Dirección IP"
+        };
+        
+        // --- DOM Elements ---
+        const csvFileInput = document.getElementById('csvFile');
+        const startDateInput = document.getElementById('startDate');
+        const endDateInput = document.getElementById('endDate');
+        const startTimeFilter = document.getElementById('startTimeFilter');
+        const endTimeFilter = document.getElementById('endTimeFilter');  
+        const userFilterSelect = document.getElementById('userFilter');
+        const eventFilterSelect = document.getElementById('eventFilter');
+        const componentFilterSelect = document.getElementById('componentFilter'); 
+        const contextFilterSelect = document.getElementById('contextFilter');
+        const ipFilterSelect = document.getElementById('ipFilter');
+        const ipFilterHelpText = document.getElementById('ipFilterHelp');
+        const analyzeButton = document.getElementById('analyzeButton');
+        const statusMessage = document.getElementById('statusMessage');
+        const resultsSection = document.getElementById('resultsSection');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const includeZeroActivitySwitch = document.getElementById('includeZeroActivitySwitch');
+        
+        const excludedUsernamesTextarea = document.getElementById('excludedUsernamesTextarea');
+        const excludedComponentsTextarea = document.getElementById('excludedComponentsTextarea');
+        const excludedEventNamesTextarea = document.getElementById('excludedEventNamesTextarea');
+        const excludedContextsTextarea = document.getElementById('excludedContextsTextarea');
+        
+        const viewEventPatternsTextarea = document.getElementById('viewEventPatternsTextarea');
+        const participationEventPatternsTextarea = document.getElementById('participationEventPatternsTextarea');
+        const saveSettingsButton = document.getElementById('saveSettingsButton');
+
+        const dashDateRangeEl = document.getElementById('dashDateRange');
+        const dashTotalEventsEl = document.getElementById('dashTotalEvents');
+        const dashUniqueUsersEl = document.getElementById('dashUniqueUsers');
+        const dashActiveDaysEl = document.getElementById('dashActiveDays');
+        const dashAvgEventsPerDayEl = document.getElementById('dashAvgEventsPerDay');
+        const dashMostFrequentEventNameEl = document.getElementById('dashMostFrequentEventName');
+        const dashMostFrequentComponentEl = document.getElementById('dashMostFrequentComponent');
+        const dashMostActiveUserEl = document.getElementById('dashMostActiveUser');
+        
+        const logTableBody = document.getElementById('logTableBody');
+        const tableRowCountEl = document.getElementById('tableRowCount');
+
+        Chart.defaults.font.family = "system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Liberation Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'";
+        Chart.defaults.plugins.legend.position = 'bottom';
+        Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(0,0,0,0.8)';
+        Chart.defaults.plugins.tooltip.multiKeyBackground = '#000';
+        Chart.defaults.plugins.tooltip.titleFont = { size: 14, weight: 'bold'};
+        Chart.defaults.plugins.tooltip.bodyFont = { size: 12 };
+        Chart.defaults.scale.ticks.font = { size: 10 };
+        Chart.defaults.scale.title.font = { size: 12, weight: '500' };
+        Chart.defaults.scale.title.display = true;
+
+        // --- HELPER FUNCTIONS FOR CSV DOWNLOAD ---
+        function generateDynamicFilename(baseName, type = 'data') {
+            const date = new Date();
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            
+            const cleanBaseName = baseName
+                .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
+                .replace(/[^\w\s-]/g, '') 
+                .trim()
+                .replace(/\s+/g, '_') 
+                .toLowerCase();
+            const finalBaseName = cleanBaseName.substring(0, 40);
+
+            return `${finalBaseName}_${type}_${year}${month}${day}_${hours}${minutes}${seconds}.csv`;
+        }
+
+        function escapeCsvValue(value) {
+            if (value === null || value === undefined) {
+                return '';
+            }
+            let stringValue = String(value);
+            if (stringValue.includes('"') || stringValue.includes(',') || stringValue.includes('\n') || stringValue.includes('\r')) {
+                stringValue = stringValue.replace(/"/g, '""'); 
+                return `"${stringValue}"`; 
+            }
+            return stringValue;
+        }
+
+        function convertToCSV(dataArray, headers = null) {
+            let csvString = '';
+            
+            if (dataArray.length > 0 && typeof dataArray[0] === 'object' && !Array.isArray(dataArray[0]) && !headers) {
+                headers = Object.keys(dataArray[0]);
+            }
+
+            if (headers) {
+                csvString += headers.map(header => escapeCsvValue(header)).join(',') + '\r\n';
+            }
+
+            dataArray.forEach(row => {
+                let line;
+                if (Array.isArray(row)) {
+                    line = row.map(value => escapeCsvValue(value)).join(',');
+                } else if (typeof row === 'object' && row !== null && headers) {
+                    line = headers.map(header => escapeCsvValue(row[header])).join(',');
+                } else {
+                    line = escapeCsvValue(row);
+                }
+                csvString += line + '\r\n';
+            });
+            return csvString;
+        }
+
+        function downloadCSV(csvContent, filename) {
+            const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' }); // BOM for Excel
+            const link = document.createElement("a");
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } else {
+                navigator.msSaveBlob(blob, filename);
+            }
+        }
+
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setDefaultDates();
+            setDefaultTimes();
+            loadSettings(); 
+            
+            analyzeButton.addEventListener('click', handleAnalysisRequest);
+            csvFileInput.addEventListener('change', handleFileSelectionChange);
+            saveSettingsButton.addEventListener('click', handleSaveSettings);
+            includeZeroActivitySwitch.addEventListener('change', handleIncludeZeroActivityChange);
+            
+            const reprocessAndDisplay = () => { if (parsedDataCache.length > 0) processAndDisplayData(parsedDataCache); };
+            startDateInput.addEventListener('change', reprocessAndDisplay);
+            endDateInput.addEventListener('change', reprocessAndDisplay);
+            startTimeFilter.addEventListener('change', reprocessAndDisplay);
+            endTimeFilter.addEventListener('change', reprocessAndDisplay);  
+            userFilterSelect.addEventListener('change', reprocessAndDisplay);
+            eventFilterSelect.addEventListener('change', reprocessAndDisplay);
+            componentFilterSelect.addEventListener('change', reprocessAndDisplay); 
+            contextFilterSelect.addEventListener('change', reprocessAndDisplay);
+            ipFilterSelect.addEventListener('change', reprocessAndDisplay);
+
+            document.getElementById('currentYear').textContent = new Date().getFullYear();
+
+            document.addEventListener('click', function(event) {
+                const chartCard = event.target.closest('.chart-card');
+                if (chartCard) {
+                    const modalTargetId = chartCard.dataset.modalTarget;
+                    const chartType = chartCard.dataset.chartType;
+                    
+                    const modalElement = document.querySelector(modalTargetId);
+                    if (!modalElement) {
+                        console.error('Modal target not found:', modalTargetId);
+                        return;
+                    }
+
+                    const bootstrapModal = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
+                    
+                    const canvasIdInModal = modalElement.querySelector('canvas').id;
+                    renderChartInModal(chartType, canvasIdInModal);
+                    
+                    bootstrapModal.show();
+                }
+
+                // Event listener for chart CSV download buttons in modals
+                const downloadButton = event.target.closest('.download-chart-csv-button');
+                if (downloadButton) {
+                    event.preventDefault(); 
+                    const modal = downloadButton.closest('.modal');
+                    if (modal) {
+                        const canvasInModal = modal.querySelector('.modal-body canvas');
+                        // Chart.js >= v3 appends the instance to canvas._chartjs
+                        if (canvasInModal && canvasInModal._chartjs) { 
+                            const chartInstance = canvasInModal._chartjs;
+                            const chartType = downloadButton.dataset.chartType; 
+                            handleDownloadChartCsv(chartInstance, chartType, modal.id);
+                        } else if (modalChartInstance && canvasInModal && modalChartInstance.canvas.id === canvasInModal.id) {
+                            // Fallback, modalChartInstance should ideally refer to the current modal's chart
+                            const chartType = downloadButton.dataset.chartType;
+                            handleDownloadChartCsv(modalChartInstance, chartType, modal.id);
+                        } else {
+                            console.error("Could not find chart instance for modal:", modal.id);
+                            showUserMessage("Error: No se pudo obtener los datos del gráfico para descargar.", "danger");
+                        }
+                    }
+                }
+            });
+
+            const downloadLogsCsvButton = document.getElementById('downloadLogsCsvButton');
+            if (downloadLogsCsvButton) {
+                downloadLogsCsvButton.addEventListener('click', handleDownloadLogsCsv);
+            }
+
+            ipFilterSelect.disabled = true;
+            ipFilterHelpText.textContent = "Cargue un archivo CSV con columna de IP para activar este filtro.";
+        });
+
+        function setDefaultDates() {
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth(); 
+
+            const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
+            const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0); 
+
+            startDateInput.valueAsDate = firstDayOfMonth;
+            endDateInput.valueAsDate = lastDayOfMonth;
+        }
+
+        function setDefaultTimes() {
+            if (startTimeFilter) startTimeFilter.value = "00:00";
+            if (endTimeFilter) endTimeFilter.value = "23:59";
+        }
+        
+        function handleFileSelectionChange(event) {
+            const file = event.target.files[0];
+            if (file) {
+                statusMessage.textContent = `Archivo seleccionado: ${file.name}. Listo para analizar.`;
+                statusMessage.className = 'mt-3 pt-2 border-top text-info';
+                parsedDataCache = []; 
+                globallyProcessedDataForBaseLists = [];
+                filteredDataForCharts = [];
+                areFiltersPopulated = false; 
+                ipColumnAvailable = false;
+                resetFilterSelects(); 
+                destroyAllDashboardCharts(); 
+                clearDashboardStats();
+                logTableBody.innerHTML = '';
+                tableRowCountEl.textContent = '';
+                resultsSection.classList.add('hidden'); 
+            } else {
+                statusMessage.textContent = 'Ningún archivo seleccionado.';
+                statusMessage.className = 'mt-3 pt-2 border-top text-muted';
+            }
+        }
+        
+        function processExclusionText(text) {
+            return text ? text.split(',').map(s => s.trim().toLowerCase()).filter(s => s) : [];
+        }
+
+        function handleSaveSettings() {
+            excludedUserSubstrings = processExclusionText(excludedUsernamesTextarea.value);
+            localStorage.setItem('moodleViewerExclusionsUsers', JSON.stringify(excludedUserSubstrings));
+
+            excludedComponentSubstrings = processExclusionText(excludedComponentsTextarea.value);
+            localStorage.setItem('moodleViewerExclusionsComponents', JSON.stringify(excludedComponentSubstrings));
+
+            excludedEventNameSubstrings = processExclusionText(excludedEventNamesTextarea.value);
+            localStorage.setItem('moodleViewerExclusionsEventNames', JSON.stringify(excludedEventNameSubstrings));
+
+            excludedContextSubstrings = processExclusionText(excludedContextsTextarea.value);
+            localStorage.setItem('moodleViewerExclusionsContexts', JSON.stringify(excludedContextSubstrings));
+
+            const viewPatternsText = viewEventPatternsTextarea.value.trim();
+            VIEW_EVENT_PATTERNS = viewPatternsText ? viewPatternsText.split(',').map(s => s.trim().toLowerCase()).filter(s => s) : [];
+            localStorage.setItem('moodleViewerPatternsView', JSON.stringify(VIEW_EVENT_PATTERNS));
+
+            const participationPatternsText = participationEventPatternsTextarea.value.trim();
+            PARTICIPATION_EVENT_PATTERNS = participationPatternsText ? participationPatternsText.split(',').map(s => s.trim().toLowerCase()).filter(s => s) : [];
+            localStorage.setItem('moodleViewerPatternsParticipation', JSON.stringify(PARTICIPATION_EVENT_PATTERNS));
+
+            const settingsModalEl = document.getElementById('settingsModal');
+            const modalInstance = bootstrap.Modal.getInstance(settingsModalEl);
+            if (modalInstance) {
+                modalInstance.hide();
+            }
+
+            if (parsedDataCache.length > 0) {
+                showUserMessage('Configuración guardada. Reanalizando...', 'info');
+                areFiltersPopulated = false; 
+                globallyProcessedDataForBaseLists = applyGlobalExclusions(parsedDataCache);
+                processAndDisplayData(parsedDataCache);
+            } else {
+                showUserMessage('Configuración guardada. Carga un archivo para ver los cambios.', 'info');
+            }
+        }
+
+        function loadSettings() {
+            const savedUserExclusions = localStorage.getItem('moodleViewerExclusionsUsers');
+            if (savedUserExclusions) {
+                excludedUserSubstrings = JSON.parse(savedUserExclusions);
+                excludedUsernamesTextarea.value = excludedUserSubstrings.join(', ');
+            }
+
+            const savedComponentExclusions = localStorage.getItem('moodleViewerExclusionsComponents');
+            if (savedComponentExclusions) {
+                excludedComponentSubstrings = JSON.parse(savedComponentExclusions);
+                excludedComponentsTextarea.value = excludedComponentSubstrings.join(', ');
+            }
+
+            const savedEventNameExclusions = localStorage.getItem('moodleViewerExclusionsEventNames');
+            if (savedEventNameExclusions) {
+                excludedEventNameSubstrings = JSON.parse(savedEventNameExclusions);
+                excludedEventNamesTextarea.value = excludedEventNameSubstrings.join(', ');
+            }
+
+            const savedContextExclusions = localStorage.getItem('moodleViewerExclusionsContexts');
+            if (savedContextExclusions) {
+                excludedContextSubstrings = JSON.parse(savedContextExclusions);
+                excludedContextsTextarea.value = excludedContextSubstrings.join(', ');
+            }
+
+            const savedViewPatterns = localStorage.getItem('moodleViewerPatternsView');
+            if (savedViewPatterns) {
+                VIEW_EVENT_PATTERNS = JSON.parse(savedViewPatterns);
+            }
+            viewEventPatternsTextarea.value = VIEW_EVENT_PATTERNS.join(', ');
+
+
+            const savedParticipationPatterns = localStorage.getItem('moodleViewerPatternsParticipation');
+            if (savedParticipationPatterns) {
+                PARTICIPATION_EVENT_PATTERNS = JSON.parse(savedParticipationPatterns);
+            }
+            participationEventPatternsTextarea.value = PARTICIPATION_EVENT_PATTERNS.join(', ');
+
+            const savedIncludeZeroActivity = localStorage.getItem('moodleViewerIncludeZeroActivity');
+            if (savedIncludeZeroActivity !== null) {
+                includeZeroActivity = JSON.parse(savedIncludeZeroActivity);
+                includeZeroActivitySwitch.checked = includeZeroActivity;
+            } else {
+                 includeZeroActivitySwitch.checked = false; 
+                 includeZeroActivity = false;
+            }
+        }
+
+        function handleIncludeZeroActivityChange() {
+            includeZeroActivity = includeZeroActivitySwitch.checked;
+            localStorage.setItem('moodleViewerIncludeZeroActivity', JSON.stringify(includeZeroActivity));
+            if (parsedDataCache.length > 0) {
+                showUserMessage('Ajuste de visualización de ceros cambiado. Reanalizando...', 'info');
+                showLoading(true);
+                setTimeout(() => {
+                    processAndDisplayData(parsedDataCache); 
+                    showLoading(false);
+                }, 50);
+            }
+        }
+
+        function resetFilterSelects() {
+            userFilterSelect.innerHTML = '<option value="ALL_USERS">Todos los Alumnos</option>';
+            eventFilterSelect.innerHTML = '<option value="ALL_EVENTS">Todos los Eventos</option>';
+            componentFilterSelect.innerHTML = '<option value="ALL_COMPONENTS">Todos los Componentes</option>'; 
+            contextFilterSelect.innerHTML = '<option value="ALL_CONTEXTS">Todos los Contextos</option>';
+            ipFilterSelect.innerHTML = '';
+            ipFilterSelect.disabled = true;
+            ipFilterHelpText.textContent = "Cargue un archivo CSV con columna de IP para activar este filtro.";
+            setDefaultTimes();
+        }
+
+        function clearDashboardStats() {
+            dashDateRangeEl.textContent = 'N/A';
+            dashTotalEventsEl.textContent = 'N/A';
+            dashUniqueUsersEl.textContent = 'N/A';
+            dashActiveDaysEl.textContent = 'N/A';
+            dashAvgEventsPerDayEl.textContent = 'N/A';
+            dashMostFrequentEventNameEl.textContent = 'N/A';
+            dashMostFrequentComponentEl.textContent = 'N/A';
+            dashMostActiveUserEl.textContent = 'N/A';
+        }
+
+        function destroyAllDashboardCharts() {
+            if (dashUserActivityChartInstance) { dashUserActivityChartInstance.destroy(); dashUserActivityChartInstance = null; }
+            if (dashEventsOverTimeChartInstance) { dashEventsOverTimeChartInstance.destroy(); dashEventsOverTimeChartInstance = null; }
+            if (dashComponentActivityChartInstance) { dashComponentActivityChartInstance.destroy(); dashComponentActivityChartInstance = null; }
+            if (dashActivityByHourChartInstance) { dashActivityByHourChartInstance.destroy(); dashActivityByHourChartInstance = null; }
+            if (dashActivityByDayOfWeekChartInstance) { dashActivityByDayOfWeekChartInstance.destroy(); dashActivityByDayOfWeekChartInstance = null; }
+            if (dashComponentBreakdownChartInstance) { dashComponentBreakdownChartInstance.destroy(); dashComponentBreakdownChartInstance = null; }
+            if (dashActivityByContextChartInstance) { dashActivityByContextChartInstance.destroy(); dashActivityByContextChartInstance = null; }
+            
+            if (dashScatterUsersEventsDayInstance) { dashScatterUsersEventsDayInstance.destroy(); dashScatterUsersEventsDayInstance = null; }
+            if (dashScatterComponentsEventsUserInstance) { dashScatterComponentsEventsUserInstance.destroy(); dashScatterComponentsEventsUserInstance = null; }
+            if (dashScatterContentViewParticipationInstance) { dashScatterContentViewParticipationInstance.destroy(); dashScatterContentViewParticipationInstance = null; }
+            if (dashBubbleStudentAnalysisInstance) { dashBubbleStudentAnalysisInstance.destroy(); dashBubbleStudentAnalysisInstance = null; }
+            if (dashBubbleComponentAnalysisInstance) { dashBubbleComponentAnalysisInstance.destroy(); dashBubbleComponentAnalysisInstance = null; }
+            if (dashBubbleContextAnalysisInstance) { dashBubbleContextAnalysisInstance.destroy(); dashBubbleContextAnalysisInstance = null; }
+            
+            if (dashTopIPsByEventsInstance) { dashTopIPsByEventsInstance.destroy(); dashTopIPsByEventsInstance = null; }
+            if (dashUsersPerIPInstance) { dashUsersPerIPInstance.destroy(); dashUsersPerIPInstance = null; }
+            if (dashIPsPerUserInstance) { dashIPsPerUserInstance.destroy(); dashIPsPerUserInstance = null; }
+
+            let canvasIds = [
+                'dashUserActivityChart', 'dashEventsOverTimeChart', 'dashComponentActivityChart',
+                'dashActivityByHourChart', 'dashActivityByDayOfWeekChart', 'dashComponentBreakdownChart', 'dashActivityByContextChart',
+                'dashScatterUsersEventsDayChart', 'dashScatterComponentsEventsUserChart', 'dashScatterContentViewParticipationChart',
+                'dashBubbleStudentAnalysisChart', 'dashBubbleComponentAnalysisChart', 'dashBubbleContextAnalysisChart',
+                'dashTopIPsByEventsChart', 'dashUsersPerIPChart', 'dashIPsPerUserChart'
+            ];
+            canvasIds.forEach(id => {
+                const canvas = document.getElementById(id);
+                if (canvas) {
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            });
+        }
+
+        async function handleAnalysisRequest() {
+            const file = csvFileInput.files[0];
+            
+            if (parsedDataCache.length > 0 && file === undefined) { 
+                showLoading(true);
+                await new Promise(resolve => setTimeout(resolve, 50)); 
+                processAndDisplayData(parsedDataCache);
+                showLoading(false);
+                return;
+            }
+            
+            if (!file) {
+                showUserMessage("Por favor, selecciona un archivo CSV.", "danger");
+                resultsSection.classList.add('hidden');
+                return;
+            }
+            
+            showLoading(true);
+            showUserMessage('Leyendo y parseando archivo...', 'info');
+            resultsSection.classList.add('hidden'); 
+            
+            if(resultsSection.classList.contains('hidden')) {
+                destroyAllDashboardCharts();
+                clearDashboardStats();
+            }
+            
+            parsedDataCache = []; 
+            globallyProcessedDataForBaseLists = [];
+            filteredDataForCharts = [];
+            areFiltersPopulated = false; 
+            ipColumnAvailable = false;
+            resetFilterSelects();
+
+            try {
+                const csvText = await readFileAsText(file);
+                parsedDataCache = parseCSV(csvText);
+
+                if (!parsedDataCache || parsedDataCache.length === 0) {
+                    showUserMessage("No se pudieron procesar datos del CSV o el archivo está vacío.", "danger");
+                    csvFileInput.value = ""; 
+                    parsedDataCache = [];
+                    resultsSection.classList.add('hidden');
+                    return;
+                }
+
+                globallyProcessedDataForBaseLists = applyGlobalExclusions(parsedDataCache);
+
+                if (parsedDataCache.length > 0 && parsedDataCache[0].hasOwnProperty('IP_ADDRESS')) {
+                    ipColumnAvailable = true; 
+                    ipFilterSelect.disabled = false;
+                    ipFilterHelpText.textContent = "Seleccione una o más IPs. Ninguna selección implica todas.";
+                } else {
+                    ipColumnAvailable = false;
+                    ipFilterSelect.disabled = true;
+                    ipFilterHelpText.textContent = "Columna 'Dirección IP' no encontrada en el archivo.";
+                }
+                
+                processAndDisplayData(parsedDataCache);
+                resultsSection.classList.remove('hidden');
+
+            } catch (error) {
+                console.error("Error durante el análisis:", error);
+                showUserMessage(`Error al procesar el archivo: ${error.message}. Revisa la consola.`, "danger");
+                parsedDataCache = [];
+                globallyProcessedDataForBaseLists = [];
+                csvFileInput.value = ""; 
+                resultsSection.classList.add('hidden');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        function showLoading(isLoading) {
+            const controls = [
+                csvFileInput, startDateInput, endDateInput, startTimeFilter, endTimeFilter,
+                userFilterSelect, eventFilterSelect, componentFilterSelect, contextFilterSelect, ipFilterSelect, analyzeButton,
+                includeZeroActivitySwitch
+            ];
+            if (isLoading) {
+                loadingIndicator.classList.remove('hidden');
+                controls.forEach(control => control.disabled = true);
+            } else {
+                loadingIndicator.classList.add('hidden');
+                controls.forEach(control => {
+                    if (control.id === 'ipFilter') {
+                        control.disabled = !ipColumnAvailable;
+                    } else {
+                        control.disabled = false;
+                    }
+                });
+            }
+        }
+
+        function readFileAsText(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = event => resolve(event.target.result);
+                reader.onerror = error => reject(error);
+                reader.readAsText(file, 'UTF-8');
+            });
+        }
+
+        function parseCSV(csvText) {
+            const lines = csvText.trim().split(/\r?\n/);
+            if (lines.length < 2) return [];
+            const rawHeaderLine = lines[0].trim();
+            const headerNames = parseCSVLine(rawHeaderLine); 
+            const headerToStandardKeyMap = {};
+            for (const key in CSV_COLUMN_MAPPING) {
+                headerToStandardKeyMap[CSV_COLUMN_MAPPING[key]] = key;
+            }
+            const columnIndexToStandardKey = headerNames.map(name => headerToStandardKeyMap[name.trim()] || null);
+            const data = [];
+            for (let i = 1; i < lines.length; i++) {
+                const lineContent = lines[i].trim();
+                if (lineContent === '') continue;
+                const values = parseCSVLine(lineContent);
+                if (values.length !== headerNames.length) {
+                    console.warn(`Discrepancia en número de columnas en línea ${i+1}. Esperado: ${headerNames.length}, Obtenido: ${values.length}. Línea: "${lines[i]}"`);
+                    continue; 
+                }
+                const rowObject = {};
+                let hasRequiredColumns = true;
+                columnIndexToStandardKey.forEach((standardKey, index) => {
+                    if (standardKey) rowObject[standardKey] = values[index];
+                });
+                if (!rowObject.TIME || !rowObject.FULL_NAME || !rowObject.COMPONENT || !rowObject.EVENT_NAME || !rowObject.EVENT_CONTEXT) {
+                    hasRequiredColumns = false; 
+                }
+                if (hasRequiredColumns) data.push(rowObject);
+            }
+            return data;
+        }
+
+        function parseCSVLine(line) {
+            const values = [];
+            let inQuotes = false;
+            let currentValue = '';
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"') {
+                    if (inQuotes && i + 1 < line.length && line[i+1] === '"') {
+                        currentValue += '"'; i++; 
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (char === ',' && !inQuotes) {
+                    values.push(currentValue); currentValue = '';
+                } else {
+                    currentValue += char;
+                }
+            }
+            values.push(currentValue);
+            return values.map(v => v.trim()); 
+        }
+        
+        function parseMoodleDate(dateString) {
+            if (!dateString || typeof dateString !== 'string') return null;
+            const parts = dateString.split(',');
+            if (parts.length !== 2) return null;
+            const datePart = parts[0].trim(); 
+            const timePart = parts[1].trim(); 
+            const dateSegments = datePart.split('/');
+            if (dateSegments.length !== 3) return null;
+            let day = parseInt(dateSegments[0], 10);
+            let month = parseInt(dateSegments[1], 10) - 1; 
+            let yearSuffix = parseInt(dateSegments[2], 10);
+            let year = (yearSuffix < 70) ? 2000 + yearSuffix : 1900 + yearSuffix;
+            const timeSegments = timePart.split(':');
+            if (timeSegments.length !== 3) return null;
+            let hours = parseInt(timeSegments[0], 10);
+            let minutes = parseInt(timeSegments[1], 10);
+            let seconds = parseInt(timeSegments[2], 10);
+            if (isNaN(day) || isNaN(month) || isNaN(year) || isNaN(hours) || isNaN(minutes) || isNaN(seconds) ||
+                month < 0 || month > 11 || day < 1 || day > 31 || 
+                hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) {
+                return null;
+            }
+            const parsed = new Date(year, month, day, hours, minutes, seconds);
+             if (isNaN(parsed.getTime())) return null;
+            return parsed;
+        }
+
+        function populateFilterSelects(dataToGetOptionsFrom) { 
+            const uniqueUserNames = [...new Set(dataToGetOptionsFrom.map(row => row.FULL_NAME || "Usuario Desconocido"))].sort();
+            const uniqueEventNames = [...new Set(dataToGetOptionsFrom.map(row => row.EVENT_NAME || "Evento Desconocido"))].sort();
+            const uniqueComponents = [...new Set(dataToGetOptionsFrom.map(row => row.COMPONENT || "Componente Desconocido"))].sort();
+            const uniqueContexts = [...new Set(dataToGetOptionsFrom.map(row => row.EVENT_CONTEXT || "Contexto Desconocido"))].sort();
+
+            const selectedUser = userFilterSelect.value;
+            const selectedEvent = eventFilterSelect.value;
+            const selectedComponent = componentFilterSelect.value; 
+            const selectedContext = contextFilterSelect.value;
+            const selectedIPs = Array.from(ipFilterSelect.selectedOptions).map(opt => opt.value);
+
+
+            userFilterSelect.innerHTML = '<option value="ALL_USERS">Todos los Alumnos</option>';
+            uniqueUserNames.forEach(name => {
+                const option = document.createElement('option'); option.value = name; option.textContent = name;
+                userFilterSelect.appendChild(option);
+            });
+            if (userFilterSelect.querySelector(`option[value="${selectedUser}"]`)) userFilterSelect.value = selectedUser;
+            else userFilterSelect.value = "ALL_USERS";
+
+            eventFilterSelect.innerHTML = '<option value="ALL_EVENTS">Todos los Eventos</option>';
+            uniqueEventNames.forEach(name => {
+                const option = document.createElement('option'); option.value = name; option.textContent = name;
+                eventFilterSelect.appendChild(option);
+            });
+            if (eventFilterSelect.querySelector(`option[value="${selectedEvent}"]`)) eventFilterSelect.value = selectedEvent;
+            else eventFilterSelect.value = "ALL_EVENTS";
+            
+            componentFilterSelect.innerHTML = '<option value="ALL_COMPONENTS">Todos los Componentes</option>';
+            uniqueComponents.forEach(name => {
+                const option = document.createElement('option'); option.value = name; option.textContent = name;
+                componentFilterSelect.appendChild(option);
+            });
+            if (componentFilterSelect.querySelector(`option[value="${selectedComponent}"]`)) componentFilterSelect.value = selectedComponent;
+            else componentFilterSelect.value = "ALL_COMPONENTS";
+
+
+            contextFilterSelect.innerHTML = '<option value="ALL_CONTEXTS">Todos los Contextos</option>';
+            uniqueContexts.forEach(name => {
+                const option = document.createElement('option'); option.value = name; option.textContent = name;
+                contextFilterSelect.appendChild(option);
+            });
+            if (contextFilterSelect.querySelector(`option[value="${selectedContext}"]`)) contextFilterSelect.value = selectedContext;
+            else contextFilterSelect.value = "ALL_CONTEXTS";
+
+            ipFilterSelect.innerHTML = ''; 
+            if (ipColumnAvailable) {
+                const uniqueIPs = [...new Set(dataToGetOptionsFrom.map(row => row.IP_ADDRESS || "IP Desconocida").filter(ip => ip !== "IP Desconocida"))].sort();
+                uniqueIPs.forEach(ip => {
+                    const option = document.createElement('option');
+                    option.value = ip;
+                    option.textContent = ip;
+                    if(selectedIPs.includes(ip)) option.selected = true;
+                    ipFilterSelect.appendChild(option);
+                });
+                ipFilterSelect.disabled = false;
+                ipFilterHelpText.textContent = "Seleccione una o más IPs. Ninguna selección implica todas.";
+            } else {
+                ipFilterSelect.disabled = true;
+                ipFilterHelpText.textContent = "Columna 'Dirección IP' no encontrada en el archivo.";
+            }
+
+            areFiltersPopulated = true;
+        }
+        
+        function applyGlobalExclusions(sourceData) {
+            let data = [...sourceData];
+
+            if (excludedUserSubstrings.length > 0) {
+                data = data.filter(row => {
+                    const userNameLower = (row.FULL_NAME || "").toLowerCase();
+                    return !excludedUserSubstrings.some(substring => userNameLower.includes(substring));
+                });
+            }
+            if (excludedComponentSubstrings.length > 0) {
+                data = data.filter(row => {
+                    const componentNameLower = (row.COMPONENT || "").toLowerCase();
+                    return !excludedComponentSubstrings.some(substring => componentNameLower.includes(substring));
+                });
+            }
+            if (excludedEventNameSubstrings.length > 0) {
+                data = data.filter(row => {
+                    const eventNameLower = (row.EVENT_NAME || "").toLowerCase();
+                    return !excludedEventNameSubstrings.some(substring => eventNameLower.includes(substring));
+                });
+            }
+            if (excludedContextSubstrings.length > 0) {
+                data = data.filter(row => {
+                    const contextNameLower = (row.EVENT_CONTEXT || "").toLowerCase();
+                    return !excludedContextSubstrings.some(substring => contextNameLower.includes(substring));
+                });
+            }
+            return data;
+        }
+
+        function processAndDisplayData(sourceDataIgnored) { 
+            if (!parsedDataCache || parsedDataCache.length === 0) {
+                showUserMessage("No hay datos cargados para analizar.", "warning");
+                resultsSection.classList.add('hidden');
+                destroyAllDashboardCharts();
+                clearDashboardStats();
+                return;
+            }
+            
+            let dataToProcessAfterGlobalExclusions = globallyProcessedDataForBaseLists;
+
+            if (!areFiltersPopulated) { 
+                populateFilterSelects(dataToProcessAfterGlobalExclusions); 
+            }
+
+            const startDateVal = startDateInput.valueAsDate;
+            const endDateVal = endDateInput.valueAsDate;
+            const startTimeString = startTimeFilter.value;
+            const endTimeString = endTimeFilter.value;    
+            const selectedUser = userFilterSelect.value;
+            const selectedEvent = eventFilterSelect.value;
+            const selectedComponent = componentFilterSelect.value; 
+            const selectedContext = contextFilterSelect.value;
+            const selectedIPs = Array.from(ipFilterSelect.selectedOptions).map(opt => opt.value);
+
+
+            if (!startDateVal || !endDateVal) {
+                showUserMessage("Fechas de inicio o fin inválidas.", "danger");
+                resultsSection.classList.add('hidden');
+                return;
+            }
+            
+            const startDateObj = new Date(startDateVal.valueOf()); startDateObj.setHours(0,0,0,0);
+            const endDateObj = new Date(endDateVal.valueOf()); endDateObj.setHours(23, 59, 59, 999); 
+
+            if (startDateObj > endDateObj) {
+                showUserMessage("La fecha de inicio no puede ser posterior a la fecha de fin.", "danger");
+                resultsSection.classList.add('hidden');
+                return;
+            }
+
+            let filterStartHour = 0, filterStartMinute = 0;
+            let filterEndHour = 23, filterEndMinute = 59;
+
+            if (startTimeString) {
+                [filterStartHour, filterStartMinute] = startTimeString.split(':').map(Number);
+            }
+            if (endTimeString) {
+                [filterEndHour, filterEndMinute] = endTimeString.split(':').map(Number);
+            }
+            
+            const filterStartTimeInMinutes = filterStartHour * 60 + filterStartMinute;
+            const filterEndTimeInMinutes = filterEndHour * 60 + filterEndMinute;
+
+            filteredDataForCharts = dataToProcessAfterGlobalExclusions.filter(row => {
+                const eventDate = parseMoodleDate(row.TIME);
+                if (!eventDate) return false;
+
+                const dateMatches = eventDate >= startDateObj && eventDate <= endDateObj;
+                if (!dateMatches) return false;
+
+                const eventHour = eventDate.getHours();
+                const eventMinute = eventDate.getMinutes();
+                const eventTimeInMinutes = eventHour * 60 + eventMinute;
+
+                let timeMatches = false;
+                if (filterStartTimeInMinutes <= filterEndTimeInMinutes) {
+                    timeMatches = eventTimeInMinutes >= filterStartTimeInMinutes && eventTimeInMinutes <= filterEndTimeInMinutes;
+                } else { 
+                    timeMatches = eventTimeInMinutes >= filterStartTimeInMinutes || eventTimeInMinutes <= filterEndTimeInMinutes;
+                }
+                if (!timeMatches) return false;
+                
+                return true; 
+            });
+            
+            if (selectedUser !== "ALL_USERS") filteredDataForCharts = filteredDataForCharts.filter(row => (row.FULL_NAME || "Usuario Desconocido") === selectedUser);
+            if (selectedEvent !== "ALL_EVENTS") filteredDataForCharts = filteredDataForCharts.filter(row => (row.EVENT_NAME || "Evento Desconocido") === selectedEvent);
+            if (selectedComponent !== "ALL_COMPONENTS") filteredDataForCharts = filteredDataForCharts.filter(row => (row.COMPONENT || "Componente Desconocido") === selectedComponent); 
+            if (selectedContext !== "ALL_CONTEXTS") filteredDataForCharts = filteredDataForCharts.filter(row => (row.EVENT_CONTEXT || "Contexto Desconocido") === selectedContext);
+            
+            if (ipColumnAvailable && selectedIPs.length > 0) {
+                filteredDataForCharts = filteredDataForCharts.filter(row => selectedIPs.includes(row.IP_ADDRESS || "IP Desconocida"));
+            }
+
+            if (filteredDataForCharts.length === 0 && !includeZeroActivity) {
+                showUserMessage("No hay eventos que coincidan con los filtros y exclusiones aplicadas.", "warning");
+                clearDashboardStats(); 
+                dashDateRangeEl.textContent = `${startDateVal.toLocaleDateString()} - ${endDateVal.toLocaleDateString()}`;
+                destroyAllDashboardCharts(); 
+                renderAllDashboardCharts(); 
+                logTableBody.innerHTML = '<tr><td colspan="6" class="text-center">No hay datos para mostrar.</td></tr>';
+                tableRowCountEl.textContent = `Mostrando 0 filas.`;
+                resultsSection.classList.remove('hidden'); 
+                return;
+            }
+
+            const totalEvents = filteredDataForCharts.length;
+            const userActivityAllFiltered = {}; 
+            const uniqueEventDates = new Set();
+            filteredDataForCharts.forEach(row => { 
+                userActivityAllFiltered[row.FULL_NAME || "Usuario Desconocido"] = (userActivityAllFiltered[row.FULL_NAME || "Usuario Desconocido"] || 0) + 1;
+                const eventDate = parseMoodleDate(row.TIME);
+                if (eventDate) {
+                    uniqueEventDates.add(eventDate.toISOString().split('T')[0]);
+                }
+            });
+            const uniqueUsers = Object.keys(userActivityAllFiltered).length;
+            const activeDaysCount = uniqueEventDates.size;
+            const avgEventsPerDay = activeDaysCount > 0 ? (totalEvents / activeDaysCount).toFixed(2) : "0.00";
+            
+            const componentActivityAllFiltered = {};
+            filteredDataForCharts.forEach(row => { componentActivityAllFiltered[row.COMPONENT || "Componente Desconocido"] = (componentActivityAllFiltered[row.COMPONENT || "Componente Desconocido"] || 0) + 1; });
+            const eventNameActivityAllFiltered = {};
+            filteredDataForCharts.forEach(row => { eventNameActivityAllFiltered[row.EVENT_NAME || "Nombre Evento Desconocido"] = (eventNameActivityAllFiltered[row.EVENT_NAME || "Nombre Evento Desconocido"] || 0) + 1; });
+            
+            const mostActiveUserData = Object.keys(userActivityAllFiltered).length > 0 ? Object.entries(userActivityAllFiltered).reduce((max, current) => current[1] > max[1] ? current : max, ["N/A", 0]) : ["N/A", 0];
+
+            dashDateRangeEl.textContent = `${startDateVal.toLocaleDateString()} - ${endDateVal.toLocaleDateString()}`;
+            dashTotalEventsEl.textContent = totalEvents;
+            dashUniqueUsersEl.textContent = uniqueUsers;
+            dashActiveDaysEl.textContent = activeDaysCount;
+            dashAvgEventsPerDayEl.textContent = avgEventsPerDay;
+            dashMostFrequentEventNameEl.textContent = getMostFrequent(eventNameActivityAllFiltered) || "N/A";
+            dashMostFrequentComponentEl.textContent = getMostFrequent(componentActivityAllFiltered) || "N/A";
+            dashMostActiveUserEl.textContent = mostActiveUserData[1] > 0 ? `${mostActiveUserData[0]} (${mostActiveUserData[1]} eventos)`: "N/A";
+
+            renderAllDashboardCharts();
+            renderLogTable(filteredDataForCharts);
+
+            resultsSection.classList.remove('hidden');
+            showUserMessage(`Análisis completado. Mostrando ${filteredDataForCharts.length} eventos.`, "success");
+        }
+
+        function getMostFrequent(activityObject) {
+            if (Object.keys(activityObject).length === 0) return null;
+            return Object.entries(activityObject).reduce((a, b) => a[1] > b[1] ? a : b)[0];
+        }
+        
+        function calculateUserActivityData(dataForCounts, topN = 15, useZeroInclusionLogic = false, baseDataForEntityList = []) {
+            const activity = {};
+
+            if (useZeroInclusionLogic && baseDataForEntityList.length > 0) {
+                const uniqueBaseUsers = [...new Set(baseDataForEntityList.map(row => row.FULL_NAME || "Usuario Desconocido"))];
+                uniqueBaseUsers.forEach(user => activity[user] = 0);
+            }
+
+            dataForCounts.forEach(row => {
+                const userName = row.FULL_NAME || "Usuario Desconocido";
+                if (useZeroInclusionLogic && baseDataForEntityList.length > 0) {
+                    if (activity.hasOwnProperty(userName)) {
+                        activity[userName]++;
+                    }
+                } else {
+                    activity[userName] = (activity[userName] || 0) + 1;
+                }
+            });
+
+            let sortedArray = Object.entries(activity)
+                .sort((a,b) => (b[1] - a[1]) || a[0].localeCompare(b[0])); 
+            
+            const finalSorted = (topN > 0 && sortedArray.length > topN) ? sortedArray.slice(0, topN) : sortedArray;
+            return { labels: finalSorted.map(e => e[0]), dataValues: finalSorted.map(e => e[1]) };
+        }
+
+        function calculateComponentActivityData(dataForCounts, topN = 10, useZeroInclusionLogic = false, baseDataForEntityList = []) {
+            const activity = {};
+
+            if (useZeroInclusionLogic && baseDataForEntityList.length > 0) {
+                const uniqueBaseComponents = [...new Set(baseDataForEntityList.map(row => row.COMPONENT || "Componente Desconocido"))];
+                uniqueBaseComponents.forEach(component => activity[component] = 0);
+            }
+
+            dataForCounts.forEach(row => {
+                const componentName = row.COMPONENT || "Componente Desconocido";
+                if (useZeroInclusionLogic && baseDataForEntityList.length > 0) {
+                    if (activity.hasOwnProperty(componentName)) {
+                        activity[componentName]++;
+                    }
+                } else {
+                    activity[componentName] = (activity[componentName] || 0) + 1;
+                }
+            });
+
+            let sortedArray = Object.entries(activity)
+                .sort((a,b) => (b[1] - a[1]) || a[0].localeCompare(b[0]));
+            
+            const finalSorted = (topN > 0 && sortedArray.length > topN) ? sortedArray.slice(0, topN) : sortedArray;
+            return { labels: finalSorted.map(e => e[0]), dataValues: finalSorted.map(e => e[1]) };
+        }
+
+
+        function calculateEventsOverTimeData(data, filterStartDate, filterEndDate) {
+            const eventsByDay = {};
+            let currentDate = new Date(filterStartDate.valueOf());
+            const endDateLoop = new Date(filterEndDate.valueOf());
+
+            while(currentDate <= endDateLoop) {
+                const dayKey = currentDate.toISOString().split('T')[0];
+                eventsByDay[dayKey] = 0;
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            
+            data.forEach(row => {
+                const eventDate = parseMoodleDate(row.TIME);
+                if (eventDate && eventDate >= filterStartDate && eventDate <= filterEndDate) {
+                    const dayKey = eventDate.toISOString().split('T')[0];
+                    if(eventsByDay.hasOwnProperty(dayKey)){
+                       eventsByDay[dayKey]++;
+                    }
+                }
+            });
+            const sortedDays = Object.keys(eventsByDay).sort((a, b) => new Date(a) - new Date(b));
+            return { labels: sortedDays, dataValues: sortedDays.map(day => eventsByDay[day]) };
+        }
+
+        function calculateActivityByHourData(data) {
+            const hours = Array(24).fill(0);
+            data.forEach(row => {
+                const eventDate = parseMoodleDate(row.TIME);
+                if (eventDate) hours[eventDate.getHours()]++;
+            });
+            return { 
+                labels: hours.map((_, i) => `${String(i).padStart(2, '0')}:00`), 
+                dataValues: hours 
+            };
+        }
+
+        function calculateActivityByDayOfWeekData(data) {
+            const days = Array(7).fill(0); 
+            const dayNames = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+            data.forEach(row => {
+                const eventDate = parseMoodleDate(row.TIME);
+                if (eventDate) {
+                    const dayOfWeek = eventDate.getDay(); 
+                    const adjustedIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1; 
+                    days[adjustedIndex]++;
+                }
+            });
+            return { labels: dayNames, dataValues: days };
+        }
+        
+        function calculateActivityByContextData(dataForCounts, topN = 10, useBaseListForZeros = false, baseDataForEntityList = []) {
+            const activity = {};
+
+            if (useBaseListForZeros && baseDataForEntityList.length > 0) {
+                const allPossibleContextsFromBase = [...new Set(baseDataForEntityList.map(row => row.EVENT_CONTEXT || "Contexto Desconocido"))];
+                allPossibleContextsFromBase.forEach(ctx => activity[ctx] = 0);
+                
+                dataForCounts.forEach(row => {
+                    const contextName = row.EVENT_CONTEXT || "Contexto Desconocido";
+                    if (activity.hasOwnProperty(contextName)) { 
+                        activity[contextName]++;
+                    }
+                });
+            } else {
+                dataForCounts.forEach(row => { 
+                    const contextName = row.EVENT_CONTEXT || "Contexto Desconocido";
+                    activity[contextName] = (activity[contextName] || 0) + 1;
+                });
+            }
+
+            let sorted = Object.entries(activity).sort((a,b) => (b[1] - a[1]) || a[0].localeCompare(b[0]));
+            
+            if (topN > 0 && sorted.length > topN) {
+                 sorted = sorted.slice(0, topN);
+            }
+            return { labels: sorted.map(e => e[0]), dataValues: sorted.map(e => e[1]) };
+        }
+
+
+        function calculateComponentBreakdownData(data, topNComponents = 3, topNEventsPerComponent = 3) {
+            const componentActivity = {};
+            data.forEach(row => {
+                const component = row.COMPONENT || "Componente Desconocido";
+                componentActivity[component] = (componentActivity[component] || 0) + 1;
+            });
+        
+            const sortedComponents = Object.entries(componentActivity)
+                .sort(([,a],[,b]) => b-a)
+                .slice(0, topNComponents)
+                .map(entry => entry[0]);
+        
+            const eventBreakdown = {}; 
+            const allEventNames = new Set();
+        
+            sortedComponents.forEach(comp => {
+                eventBreakdown[comp] = {};
+                const componentEvents = data.filter(row => (row.COMPONENT || "Componente Desconocido") === comp);
+                const eventCountsInComponent = {};
+                componentEvents.forEach(row => {
+                    const eventName = row.EVENT_NAME || "Evento Desconocido";
+                    eventCountsInComponent[eventName] = (eventCountsInComponent[eventName] || 0) + 1;
+                });
+        
+                Object.entries(eventCountsInComponent)
+                    .sort(([,a],[,b]) => b-a)
+                    .slice(0, topNEventsPerComponent)
+                    .forEach(([eventName, count]) => {
+                        eventBreakdown[comp][eventName] = count;
+                        allEventNames.add(eventName);
+                    });
+            });
+            
+            const uniqueEventNamesArray = Array.from(allEventNames).sort();
+            const datasets = uniqueEventNamesArray.map(eventName => {
+                return {
+                    label: eventName,
+                    data: sortedComponents.map(comp => eventBreakdown[comp]?.[eventName] || 0),
+                };
+            });
+        
+            return { labels: sortedComponents, datasets: datasets };
+        }
+
+        function calculateScatterUsersEventsDayData(data) {
+            const dailyActivity = {};
+            data.forEach(row => {
+                const eventDate = parseMoodleDate(row.TIME);
+                if (!eventDate) return []; // Should be return; not return []
+                const dayKey = eventDate.toISOString().split('T')[0];
+                if (!dailyActivity[dayKey]) {
+                    dailyActivity[dayKey] = { users: new Set(), eventCount: 0, date: eventDate };
+                }
+                dailyActivity[dayKey].users.add(row.FULL_NAME || "Usuario Desconocido");
+                dailyActivity[dayKey].eventCount++;
+            });
+
+            return Object.entries(dailyActivity).map(([day, stats]) => ({
+                x: stats.users.size,
+                y: stats.eventCount,
+                label: new Date(stats.date).toLocaleDateString('es-ES', { year: 'numeric', month: '2-digit', day: '2-digit' }) 
+            })).sort((a,b) => new Date(a.label.split('/').reverse().join('-')) - new Date(b.label.split('/').reverse().join('-')));
+        }
+
+        function calculateScatterComponentsEventsUserData(data) {
+            const userComponentActivity = {};
+            data.forEach(row => {
+                const userName = row.FULL_NAME || "Usuario Desconocido";
+                const component = row.COMPONENT || "Componente Desconocido";
+                if (!userComponentActivity[userName]) {
+                    userComponentActivity[userName] = { components: new Set(), eventCount: 0 };
+                }
+                userComponentActivity[userName].components.add(component);
+                userComponentActivity[userName].eventCount++;
+            });
+            return Object.entries(userComponentActivity).map(([user, stats]) => ({
+                x: stats.components.size,
+                y: stats.eventCount,
+                label: user
+            }));
+        }
+
+        function calculateScatterContentViewParticipationData(data) {
+            const userInteractionProfile = {};
+            const viewPatternsLower = VIEW_EVENT_PATTERNS.map(p => p.toLowerCase());
+            const participationPatternsLower = PARTICIPATION_EVENT_PATTERNS.map(p => p.toLowerCase());
+
+            data.forEach(row => {
+                const userName = row.FULL_NAME || "Usuario Desconocido";
+                const eventName = (row.EVENT_NAME || "").toLowerCase();
+                if (!userInteractionProfile[userName]) {
+                    userInteractionProfile[userName] = { viewEvents: 0, participationEvents: 0 };
+                }
+
+                let isViewEvent = viewPatternsLower.some(pattern => eventName.includes(pattern));
+                let isParticipationEvent = participationPatternsLower.some(pattern => eventName.includes(pattern));
+
+                if (isViewEvent) {
+                    userInteractionProfile[userName].viewEvents++;
+                }
+                if (isParticipationEvent && !isViewEvent) { 
+                    userInteractionProfile[userName].participationEvents++;
+                }
+            });
+            return Object.entries(userInteractionProfile).map(([user, stats]) => ({
+                x: stats.viewEvents,
+                y: stats.participationEvents,
+                label: user
+            }));
+        }
+        
+        function calculateBubbleStudentAnalysisData(data) {
+            const studentProfiles = {};
+            data.forEach(row => {
+                const userName = row.FULL_NAME || "Usuario Desconocido";
+                const eventDate = parseMoodleDate(row.TIME);
+                if (!eventDate) return;
+                const dayKey = eventDate.toISOString().split('T')[0];
+
+                if (!studentProfiles[userName]) {
+                    studentProfiles[userName] = { activeDays: new Set(), totalEvents: 0 };
+                }
+                studentProfiles[userName].activeDays.add(dayKey);
+                studentProfiles[userName].totalEvents++;
+            });
+
+            return Object.entries(studentProfiles).map(([user, stats]) => {
+                const numActiveDays = stats.activeDays.size;
+                const avgEventsPerDay = numActiveDays > 0 ? (stats.totalEvents / numActiveDays) : 0;
+                return {
+                    x: numActiveDays,
+                    y: parseFloat(avgEventsPerDay.toFixed(2)),
+                    r: Math.max(5, stats.totalEvents / 10), 
+                    _rawR: stats.totalEvents, 
+                    label: user
+                };
+            });
+        }
+
+        function calculateBubbleComponentAnalysisData(data) {
+            const componentProfiles = {};
+            data.forEach(row => {
+                const componentName = row.COMPONENT || "Componente Desconocido";
+                const userName = row.FULL_NAME || "Usuario Desconocido";
+                if (!componentProfiles[componentName]) {
+                    componentProfiles[componentName] = { uniqueUsers: new Set(), totalEvents: 0 };
+                }
+                componentProfiles[componentName].uniqueUsers.add(userName);
+                componentProfiles[componentName].totalEvents++;
+            });
+            return Object.entries(componentProfiles).map(([component, stats]) => {
+                const numUniqueUsers = stats.uniqueUsers.size;
+                const avgEventsPerUser = numUniqueUsers > 0 ? (stats.totalEvents / numUniqueUsers) : 0;
+                return {
+                    x: numUniqueUsers,
+                    y: stats.totalEvents,
+                    r: Math.max(5, parseFloat(avgEventsPerUser.toFixed(2))), 
+                    _rawR: parseFloat(avgEventsPerUser.toFixed(2)),
+                    label: component
+                };
+            });
+        }
+
+        function calculateBubbleContextAnalysisData(data) {
+            const contextProfiles = {};
+            data.forEach(row => {
+                const contextName = row.EVENT_CONTEXT || "Contexto Desconocido";
+                const userName = row.FULL_NAME || "Usuario Desconocido";
+                if (!contextProfiles[contextName]) {
+                    contextProfiles[contextName] = { activeStudents: new Set(), totalEvents: 0 };
+                }
+                contextProfiles[contextName].activeStudents.add(userName);
+                contextProfiles[contextName].totalEvents++;
+            });
+            return Object.entries(contextProfiles).map(([context, stats]) => {
+                const numActiveStudents = stats.activeStudents.size;
+                const avgEventsPerStudent = numActiveStudents > 0 ? (stats.totalEvents / numActiveStudents) : 0;
+                return {
+                    x: numActiveStudents,
+                    y: parseFloat(avgEventsPerStudent.toFixed(2)),
+                    r: Math.max(5, stats.totalEvents / 20), 
+                    _rawR: stats.totalEvents,
+                    label: context
+                };
+            });
+        }
+
+        function calculateTopIPsByEventsData(dataForCounts, topN = 10, useZeroInclusionLogic = false, baseDataForEntityList = []) {
+            if (!ipColumnAvailable) return { labels: [], dataValues: [] };
+            const ipActivity = {};
+
+            if (useZeroInclusionLogic && baseDataForEntityList.length > 0) {
+                const uniqueBaseIPs = [...new Set(baseDataForEntityList.map(row => row.IP_ADDRESS).filter(ip => ip && ip !== "IP Desconocida"))];
+                uniqueBaseIPs.forEach(ip => ipActivity[ip] = 0);
+            }
+
+            dataForCounts.forEach(row => {
+                const ip = row.IP_ADDRESS || "IP Desconocida";
+                if (ip === "IP Desconocida") return;
+
+                if (useZeroInclusionLogic && baseDataForEntityList.length > 0) {
+                    if (ipActivity.hasOwnProperty(ip)) {
+                        ipActivity[ip]++;
+                    }
+                } else {
+                    ipActivity[ip] = (ipActivity[ip] || 0) + 1;
+                }
+            });
+
+            let sortedArray = Object.entries(ipActivity)
+                .sort((a,b) => (b[1] - a[1]) || a[0].localeCompare(b[0]));
+            
+            const finalSorted = (topN > 0 && sortedArray.length > topN) ? sortedArray.slice(0, topN) : sortedArray;
+            return { labels: finalSorted.map(e => e[0]), dataValues: finalSorted.map(e => e[1]) };
+        }
+
+        function calculateUsersPerIPData(dataForCounts, topN = 10, useZeroInclusionLogic = false, baseDataForEntityList = []) {
+            if (!ipColumnAvailable) return { labels: [], dataValues: [] };
+            const ipUserSets = {};
+
+            if (useZeroInclusionLogic && baseDataForEntityList.length > 0) {
+                const uniqueBaseIPs = [...new Set(baseDataForEntityList.map(row => row.IP_ADDRESS).filter(ip => ip && ip !== "IP Desconocida"))];
+                uniqueBaseIPs.forEach(ip => ipUserSets[ip] = new Set());
+            }
+
+            dataForCounts.forEach(row => {
+                const ip = row.IP_ADDRESS || "IP Desconocida";
+                const user = row.FULL_NAME || "Usuario Desconocido";
+                if (ip === "IP Desconocida") return;
+
+                if (useZeroInclusionLogic && baseDataForEntityList.length > 0) {
+                    if (ipUserSets.hasOwnProperty(ip)) {
+                        ipUserSets[ip].add(user);
+                    }
+                } else {
+                    if (!ipUserSets[ip]) {
+                        ipUserSets[ip] = new Set();
+                    }
+                    ipUserSets[ip].add(user);
+                }
+            });
+
+            const ipUserCounts = Object.entries(ipUserSets).map(([ip, usersSet]) => [ip, usersSet.size]);
+            let sortedArray = ipUserCounts.sort((a,b) => (b[1] - a[1]) || a[0].localeCompare(b[0]));
+            
+            const finalSorted = (topN > 0 && sortedArray.length > topN) ? sortedArray.slice(0, topN) : sortedArray;
+            return { labels: finalSorted.map(e => e[0]), dataValues: finalSorted.map(e => e[1]) };
+        }
+
+        function calculateIPsPerUserData(dataForCounts, topN = 10, useZeroInclusionLogic = false, baseDataForEntityList = []) {
+            if (!ipColumnAvailable) return { labels: [], dataValues: [] };
+            const userIPSets = {};
+
+            if (useZeroInclusionLogic && baseDataForEntityList.length > 0) {
+                const uniqueBaseUsers = [...new Set(baseDataForEntityList.map(row => row.FULL_NAME || "Usuario Desconocido"))];
+                uniqueBaseUsers.forEach(user => userIPSets[user] = new Set());
+            }
+
+            dataForCounts.forEach(row => {
+                const user = row.FULL_NAME || "Usuario Desconocido";
+                const ip = row.IP_ADDRESS || "IP Desconocida";
+                if (ip === "IP Desconocida") return; 
+
+                if (useZeroInclusionLogic && baseDataForEntityList.length > 0) {
+                    if (userIPSets.hasOwnProperty(user)) {
+                        userIPSets[user].add(ip);
+                    }
+                } else {
+                    if (!userIPSets[user]) {
+                        userIPSets[user] = new Set();
+                    }
+                    userIPSets[user].add(ip);
+                }
+            });
+            
+            const userIPCounts = Object.entries(userIPSets).map(([user, ipSet]) => [user, ipSet.size]);
+            let sortedArray = userIPCounts.sort((a,b) => (b[1] - a[1]) || a[0].localeCompare(b[0]));
+
+            const finalSorted = (topN > 0 && sortedArray.length > topN) ? sortedArray.slice(0, topN) : sortedArray;
+            return { labels: finalSorted.map(e => e[0]), dataValues: finalSorted.map(e => e[1]) };
+        }
+
+
+        const CHART_COLORS = [
+            'rgba(255, 99, 132, 0.7)', 'rgba(54, 162, 235, 0.7)', 'rgba(255, 206, 86, 0.7)',
+            'rgba(75, 192, 192, 0.7)', 'rgba(153, 102, 255, 0.7)', 'rgba(255, 159, 64, 0.7)',
+            'rgba(199, 199, 199, 0.7)', 'rgba(83, 102, 255, 0.7)', 'rgba(40, 159, 64, 0.7)',
+            'rgba(255, 130, 50, 0.7)', 'rgba(100, 100, 255, 0.7)', 'rgba(60, 200, 100, 0.7)'
+        ];
+        function getChartColors(count) {
+            const colors = [];
+            for (let i = 0; i < count; i++) {
+                colors.push(CHART_COLORS[i % CHART_COLORS.length]);
+            }
+            return colors;
+        }
+
+        function renderAllDashboardCharts() {
+            renderDashUserActivityChart();
+            renderDashEventsOverTimeChart();
+            renderDashComponentActivityChart();
+            renderDashActivityByHourChart();
+            renderDashActivityByDayOfWeekChart();
+            renderDashComponentBreakdownChart();
+            renderDashActivityByContextChart();
+            renderDashScatterUsersEventsDayChart();
+            renderDashScatterComponentsEventsUserChart();
+            renderDashScatterContentViewParticipationChart();
+            renderDashBubbleStudentAnalysisChart();
+            renderDashBubbleComponentAnalysisChart();
+            renderDashBubbleContextAnalysisChart();
+            renderDashTopIPsByEventsChart();
+            renderDashUsersPerIPChart();
+            renderDashIPsPerUserChart();
+        }
+
+        function renderGenericChart(canvasId, existingChartInstance, chartConfig, noDataMessage = "No hay datos para mostrar.", ipSpecificMessage = "Columna 'Dirección IP' no encontrada.") {
+            if (existingChartInstance) {
+                existingChartInstance.destroy();
+            }
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) { console.error(`Canvas con ID ${canvasId} no encontrado.`); return null; }
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height); 
+
+            const isIPChart = ['dashTopIPsByEventsChart', 'dashUsersPerIPChart', 'dashIPsPerUserChart', 
+                               'topIPsByEventsModalCanvas', 'usersPerIPModalCanvas', 'ipsPerUserModalCanvas'].includes(canvasId);
+            if (isIPChart && !ipColumnAvailable) {
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = "14px " + Chart.defaults.font.family;
+                ctx.fillStyle = "#6c757d"; 
+                ctx.fillText(ipSpecificMessage, canvas.width / 2, canvas.height / 2);
+                ctx.restore();
+                return null;
+            }
+
+            const isScatterOrBubble = chartConfig.type === 'scatter' || chartConfig.type === 'bubble';
+            let hasData = false;
+            if (isScatterOrBubble) {
+                hasData = chartConfig.data.datasets && chartConfig.data.datasets.some(ds => ds.data && ds.data.length > 0);
+            } else {
+                const hasLabels = chartConfig.data.labels && chartConfig.data.labels.length > 0;
+                const hasDataInDatasets = chartConfig.data.datasets && chartConfig.data.datasets.some(ds => ds.data && ds.data.length > 0);
+                const allDatasetValuesAreZero = chartConfig.data.datasets && chartConfig.data.datasets.every(ds => ds.data.every(val => val === 0));
+                
+                const isAffectedRankingChart = [
+                    'dashUserActivityChart', 'dashComponentActivityChart', 'dashActivityByContextChart',
+                    'dashTopIPsByEventsChart', 'dashUsersPerIPChart', 'dashIPsPerUserChart',
+                    'activityByUserChart', 'activityByComponentChart', 'activityByContextChartModal',
+                    'topIPsByEventsModalCanvas', 'usersPerIPModalCanvas', 'ipsPerUserModalCanvas'
+                ].includes(canvasId);
+
+                if (isAffectedRankingChart && includeZeroActivity && hasLabels) {
+                    hasData = true;
+                } else if (hasLabels && hasDataInDatasets) {
+                    if ((chartConfig.type === 'doughnut' || chartConfig.type === 'pie') && allDatasetValuesAreZero && !(isAffectedRankingChart && includeZeroActivity)) {
+                        hasData = false;
+                    } else {
+                        hasData = true;
+                    }
+                }
+            }
+            
+            if (!hasData) {
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = "14px " + Chart.defaults.font.family;
+                ctx.fillStyle = "#6c757d"; 
+                ctx.fillText(noDataMessage, canvas.width / 2, canvas.height / 2);
+                ctx.restore();
+                return null; 
+            }
+            
+            return new Chart(ctx, chartConfig);
+        }
+
+        function renderDashUserActivityChart() {
+            const topNDashboard = 15;
+            const { labels, dataValues } = calculateUserActivityData(
+                filteredDataForCharts, 
+                topNDashboard,
+                includeZeroActivity,
+                includeZeroActivity ? globallyProcessedDataForBaseLists : []
+            );
+            const chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: `Top ${labels.length} Alumnos`, data: dataValues,
+                        backgroundColor: getChartColors(labels.length),
+                        borderColor: getChartColors(labels.length).map(c => c.replace('0.7', '1')),
+                        borderWidth: 1
+                    }]
+                },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { autoSkip: false, font: {size: 9} } }, x: { ticks: { font: {size: 9} } } } }
+            };
+            dashUserActivityChartInstance = renderGenericChart('dashUserActivityChart', dashUserActivityChartInstance, chartConfig);
+        }
+
+        function renderDashEventsOverTimeChart() {
+            const sDate = startDateInput.valueAsDate ? new Date(startDateInput.valueAsDate.valueOf()) : new Date();
+            const eDate = endDateInput.valueAsDate ? new Date(endDateInput.valueAsDate.valueOf()) : new Date();
+            sDate.setHours(0,0,0,0);
+            eDate.setHours(23,59,59,999);
+
+            const { labels, dataValues } = calculateEventsOverTimeData(filteredDataForCharts, sDate, eDate);
+            const chartConfig = {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Eventos por Día', data: dataValues,
+                        borderColor: 'rgb(75, 192, 192)', tension: 0.1, fill: false, borderWidth: 2
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: 'day', tooltipFormat: 'dd/MM/yyyy', displayFormats: {day: 'dd/MM'}}, ticks:{font:{size:9}}}, y: {beginAtZero: true, ticks:{font:{size:9}}} }, plugins: { legend: { display: false } } }
+            };
+            dashEventsOverTimeChartInstance = renderGenericChart('dashEventsOverTimeChart', dashEventsOverTimeChartInstance, chartConfig);
+        }
+        
+        function renderDashComponentActivityChart() {
+            const topNDashboard = 10;
+            const { labels, dataValues } = calculateComponentActivityData(
+                filteredDataForCharts, 
+                topNDashboard,
+                includeZeroActivity,
+                includeZeroActivity ? globallyProcessedDataForBaseLists : []
+            );
+            const chartConfig = {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Componentes', data: dataValues,
+                        backgroundColor: getChartColors(labels.length),
+                        borderColor: getChartColors(labels.length).map(c => c.replace('0.7', '1')),
+                        borderWidth: 1
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: labels.length > 0 && labels.length <= 6, labels:{font:{size:9}} } } }
+            };
+             dashComponentActivityChartInstance = renderGenericChart('dashComponentActivityChart', dashComponentActivityChartInstance, chartConfig);
+        }
+        
+        function renderDashActivityByHourChart() {
+            const { labels, dataValues } = calculateActivityByHourData(filteredDataForCharts);
+            const chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Eventos por Hora', data: dataValues,
+                        backgroundColor: CHART_COLORS[1], borderColor: CHART_COLORS[1].replace('0.7', '1'), borderWidth: 1
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: {x: {ticks: {autoSkip: true, maxTicksLimit:12, font:{size:9}}}, y:{ticks:{font:{size:9}}}} }
+            };
+            dashActivityByHourChartInstance = renderGenericChart('dashActivityByHourChart', dashActivityByHourChartInstance, chartConfig);
+        }
+
+        function renderDashActivityByDayOfWeekChart() {
+            const { labels, dataValues } = calculateActivityByDayOfWeekData(filteredDataForCharts);
+            const chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Eventos por Día Semana', data: dataValues,
+                        backgroundColor: CHART_COLORS[3], borderColor: CHART_COLORS[3].replace('0.7', '1'), borderWidth: 1
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales:{x:{ticks:{font:{size:9}}}, y:{ticks:{font:{size:9}}}} }
+            };
+            dashActivityByDayOfWeekChartInstance = renderGenericChart('dashActivityByDayOfWeekChart', dashActivityByDayOfWeekChartInstance, chartConfig);
+        }
+
+        function renderDashComponentBreakdownChart() {
+            const topNCompDash = 3, topNEventsDash = 3;
+            const { labels, datasets } = calculateComponentBreakdownData(filteredDataForCharts, topNCompDash, topNEventsDash);
+            
+            datasets.forEach((ds, index) => {
+                ds.backgroundColor = CHART_COLORS[index % CHART_COLORS.length];
+                ds.borderColor = CHART_COLORS[index % CHART_COLORS.length].replace('0.7','1');
+                ds.borderWidth = 1;
+            });
+
+            const chartConfig = {
+                type: 'bar',
+                data: { labels: labels, datasets: datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: datasets.length > 0 && datasets.length <= 5, labels:{font:{size:9}} } }, 
+                    scales: { x: { stacked: false, ticks:{font:{size:9}} }, y: { stacked: false, beginAtZero: true, ticks:{font:{size:9}} } } 
+                }
+            };
+             dashComponentBreakdownChartInstance = renderGenericChart('dashComponentBreakdownChart', dashComponentBreakdownChartInstance, chartConfig, "Pocos datos para desglose");
+        }
+        
+        function renderDashActivityByContextChart() {
+            const topNDashboard = 10;
+            const { labels, dataValues } = calculateActivityByContextData(
+                filteredDataForCharts, 
+                topNDashboard, 
+                includeZeroActivity, 
+                includeZeroActivity ? globallyProcessedDataForBaseLists : []
+            ); 
+            const chartConfig = {
+                type: 'bar', 
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: `Top ${labels.length} Contextos`, data: dataValues,
+                        backgroundColor: getChartColors(labels.length),
+                        borderColor: getChartColors(labels.length).map(c => c.replace('0.7', '1')),
+                        borderWidth: 1
+                    }]
+                },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { autoSkip: false, font:{size:9} } }, x:{ticks:{font:{size:9}}} } }
+            };
+            dashActivityByContextChartInstance = renderGenericChart('dashActivityByContextChart', dashActivityByContextChartInstance, chartConfig);
+        }
+
+        function renderDashScatterUsersEventsDayChart() {
+            const scatterData = calculateScatterUsersEventsDayData(filteredDataForCharts);
+            const chartConfig = {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Días',
+                        data: scatterData,
+                        backgroundColor: CHART_COLORS[4]
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: scatterTooltipCallbacks('Usuarios Únicos', 'Total Eventos') },
+                    scales: {
+                        x: { title: { display: true, text: 'Usuarios Únicos', font:{size:9} }, ticks:{font:{size:8}} },
+                        y: { title: { display: true, text: 'Total Eventos', font:{size:9} }, ticks:{font:{size:8}} }
+                    }
+                }
+            };
+            dashScatterUsersEventsDayInstance = renderGenericChart('dashScatterUsersEventsDayChart', dashScatterUsersEventsDayInstance, chartConfig);
+        }
+
+        function renderDashScatterComponentsEventsUserChart() {
+            const scatterData = calculateScatterComponentsEventsUserData(filteredDataForCharts);
+            const chartConfig = {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Alumnos',
+                        data: scatterData,
+                        backgroundColor: CHART_COLORS[5]
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: scatterTooltipCallbacks('Componentes Únicos', 'Total Eventos') },
+                    scales: {
+                        x: { title: { display: true, text: 'Componentes Únicos', font:{size:9} }, ticks:{font:{size:8}} },
+                        y: { title: { display: true, text: 'Total Eventos', font:{size:9} }, ticks:{font:{size:8}} }
+                    }
+                }
+            };
+            dashScatterComponentsEventsUserInstance = renderGenericChart('dashScatterComponentsEventsUserChart', dashScatterComponentsEventsUserInstance, chartConfig);
+        }
+        
+        function renderDashScatterContentViewParticipationChart() {
+            const scatterData = calculateScatterContentViewParticipationData(filteredDataForCharts);
+            const chartConfig = {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Alumnos',
+                        data: scatterData,
+                        backgroundColor: CHART_COLORS[6]
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: scatterTooltipCallbacks('Evts. Visualización', 'Evts. Participación') },
+                    scales: {
+                        x: { title: { display: true, text: 'Evts. Visualización', font:{size:9} }, ticks:{font:{size:8}} },
+                        y: { title: { display: true, text: 'Evts. Participación', font:{size:9} }, ticks:{font:{size:8}} }
+                    }
+                }
+            };
+            dashScatterContentViewParticipationInstance = renderGenericChart('dashScatterContentViewParticipationChart', dashScatterContentViewParticipationInstance, chartConfig);
+        }
+
+        function renderDashBubbleStudentAnalysisChart() {
+            const bubbleData = calculateBubbleStudentAnalysisData(filteredDataForCharts);
+            const chartConfig = {
+                type: 'bubble',
+                data: {
+                    datasets: [{
+                        label: 'Alumnos',
+                        data: bubbleData,
+                        backgroundColor: CHART_COLORS[0]
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: bubbleTooltipCallbacks('Días Act.', 'Ø Evt/Día', 'Total Evt.') },
+                    scales: {
+                        x: { title: { display: true, text: 'Días Activos', font:{size:9} }, ticks:{font:{size:8}} },
+                        y: { title: { display: true, text: 'Prom. Eventos/Día', font:{size:9} }, ticks:{font:{size:8}} }
+                    }
+                }
+            };
+            dashBubbleStudentAnalysisInstance = renderGenericChart('dashBubbleStudentAnalysisChart', dashBubbleStudentAnalysisInstance, chartConfig);
+        }
+        
+        function renderDashBubbleComponentAnalysisChart() {
+            const bubbleData = calculateBubbleComponentAnalysisData(filteredDataForCharts);
+            const chartConfig = {
+                type: 'bubble',
+                data: {
+                    datasets: [{
+                        label: 'Componentes',
+                        data: bubbleData,
+                        backgroundColor: CHART_COLORS[1]
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: bubbleTooltipCallbacks('Usr. Únicos', 'Total Evt.', 'Ø Evt/Usr') },
+                    scales: {
+                        x: { title: { display: true, text: 'Usuarios Únicos', font:{size:9} }, ticks:{font:{size:8}} },
+                        y: { title: { display: true, text: 'Total Eventos', font:{size:9} }, ticks:{font:{size:8}} }
+                    }
+                }
+            };
+            dashBubbleComponentAnalysisInstance = renderGenericChart('dashBubbleComponentAnalysisChart', dashBubbleComponentAnalysisInstance, chartConfig);
+        }
+
+        function renderDashBubbleContextAnalysisChart() {
+            const bubbleData = calculateBubbleContextAnalysisData(filteredDataForCharts);
+            const chartConfig = {
+                type: 'bubble',
+                data: {
+                    datasets: [{
+                        label: 'Contextos',
+                        data: bubbleData,
+                        backgroundColor: CHART_COLORS[2]
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: bubbleTooltipCallbacks('Alu. Activos', 'Ø Evt/Alu.', 'Total Evt.') },
+                    scales: {
+                        x: { title: { display: true, text: 'Alumnos Activos', font:{size:9} }, ticks:{font:{size:8}} },
+                        y: { title: { display: true, text: 'Prom. Eventos/Alumno', font:{size:9} }, ticks:{font:{size:8}} }
+                    }
+                }
+            };
+            dashBubbleContextAnalysisInstance = renderGenericChart('dashBubbleContextAnalysisChart', dashBubbleContextAnalysisInstance, chartConfig);
+        }
+        
+        function renderDashTopIPsByEventsChart() {
+            const topN = 10;
+            const { labels, dataValues } = calculateTopIPsByEventsData(
+                filteredDataForCharts, 
+                topN,
+                includeZeroActivity,
+                includeZeroActivity ? globallyProcessedDataForBaseLists : []
+            );
+            const chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: `Top ${labels.length} IPs por Eventos`, data: dataValues,
+                        backgroundColor: getChartColors(labels.length),
+                        borderWidth: 1
+                    }]
+                },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { autoSkip: false, font: {size: 9} } }, x: { ticks: { font: {size: 9} } } } }
+            };
+            dashTopIPsByEventsInstance = renderGenericChart('dashTopIPsByEventsChart', dashTopIPsByEventsInstance, chartConfig);
+        }
+
+        function renderDashUsersPerIPChart() {
+            const topN = 10;
+            const { labels, dataValues } = calculateUsersPerIPData(
+                filteredDataForCharts, 
+                topN,
+                includeZeroActivity,
+                includeZeroActivity ? globallyProcessedDataForBaseLists : []
+            );
+            const chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: `Top ${labels.length} IPs por Alumnos`, data: dataValues,
+                        backgroundColor: getChartColors(labels.length),
+                        borderWidth: 1
+                    }]
+                },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { autoSkip: false, font: {size: 9} } }, x: { ticks: { font: {size: 9} } } } }
+            };
+            dashUsersPerIPInstance = renderGenericChart('dashUsersPerIPChart', dashUsersPerIPInstance, chartConfig);
+        }
+
+        function renderDashIPsPerUserChart() {
+            const topN = 10;
+            const { labels, dataValues } = calculateIPsPerUserData(
+                filteredDataForCharts, 
+                topN,
+                includeZeroActivity,
+                includeZeroActivity ? globallyProcessedDataForBaseLists : []
+            );
+            const chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: `Top ${labels.length} Alumnos por IPs`, data: dataValues,
+                        backgroundColor: getChartColors(labels.length),
+                        borderWidth: 1
+                    }]
+                },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { autoSkip: false, font: {size: 9} } }, x: { ticks: { font: {size: 9} } } } }
+            };
+            dashIPsPerUserInstance = renderGenericChart('dashIPsPerUserChart', dashIPsPerUserInstance, chartConfig);
+        }
+
+        function scatterTooltipCallbacks(xLabel = 'X', yLabel = 'Y') {
+            return {
+                callbacks: {
+                    label: function(context) {
+                        const point = context.raw;
+                        let tooltipLabel = point.label || `Punto (${point.x}, ${point.y})`;
+                        return `${tooltipLabel}: (${xLabel}: ${point.x}, ${yLabel}: ${point.y})`;
+                    }
+                }
+            };
+        }
+
+        function bubbleTooltipCallbacks(xLabel = 'X', yLabel = 'Y', rLabel = 'R') {
+             return {
+                callbacks: {
+                    label: function(context) {
+                        const point = context.raw;
+                        let tooltipLabel = point.label || `Burbuja (${point.x}, ${point.y})`;
+                        const rValue = point._rawR !== undefined ? point._rawR : point.r;
+                        return `${tooltipLabel}: (${xLabel}: ${point.x}, ${yLabel}: ${point.y}, ${rLabel}: ${rValue})`;
+                    }
+                }
+            };
+        }
+
+        function renderChartInModal(type, canvasIdForModal) {
+            if (modalChartInstance) {
+                modalChartInstance.destroy();
+                modalChartInstance = null;
+            }
+            
+            const canvas = document.getElementById(canvasIdForModal);
+            if (!canvas) { console.error("Canvas para modal no encontrado:", canvasIdForModal); return; }
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height); 
+
+            let chartConfigType, chartOptions = { responsive: true, maintainAspectRatio: false };
+            let datasets = [];
+            let labels = []; 
+
+            const topNModalDefault = 0; // 0 para mostrar todos los datos en modales por defecto para rankings
+            const topNCompModal = 10, topNEventsModal = 10; 
+
+            const isIPModalChart = ['topIPsByEvents', 'usersPerIP', 'ipsPerUser'].includes(type);
+            if (isIPModalChart && !ipColumnAvailable) {
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = "16px " + Chart.defaults.font.family;
+                ctx.fillStyle = "#6c757d";
+                ctx.fillText("Columna 'Dirección IP' no encontrada en el archivo. Este gráfico no puede mostrarse.", canvas.width / 2, canvas.height / 2);
+                ctx.restore();
+                return;
+            }
+            
+            const isRankingChartType = ['userActivity', 'componentActivity', 'activityByContext', 'topIPsByEvents', 'usersPerIP', 'ipsPerUser'].includes(type);
+            if (filteredDataForCharts.length === 0 && !(isRankingChartType && includeZeroActivity)) {
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = "16px " + Chart.defaults.font.family;
+                ctx.fillStyle = "#6c757d";
+                ctx.fillText("No hay datos filtrados para mostrar en detalle.", canvas.width / 2, canvas.height / 2);
+                ctx.restore();
+                return;
+            }
+            
+            let titleForChart = "";
+            const sDateModal = startDateInput.valueAsDate ? new Date(startDateInput.valueAsDate.valueOf()) : new Date();
+            const eDateModal = endDateInput.valueAsDate ? new Date(endDateInput.valueAsDate.valueOf()) : new Date();
+            sDateModal.setHours(0,0,0,0);
+            eDateModal.setHours(23,59,59,999);
+            
+            let calculatedData; 
+
+            switch (type) {
+                case 'userActivity':
+                    const uActivity = calculateUserActivityData(
+                        filteredDataForCharts, 
+                        topNModalDefault,
+                        includeZeroActivity,
+                        includeZeroActivity ? globallyProcessedDataForBaseLists : []
+                    );
+                    labels = uActivity.labels;
+                    datasets = [{ label: 'Eventos por Alumno', data: uActivity.dataValues, backgroundColor: CHART_COLORS[0] }];
+                    chartConfigType = 'bar';
+                    chartOptions.indexAxis = 'y';
+                    chartOptions.scales = { y: { ticks: { autoSkip: false } } };
+                    titleForChart = `Actividad por Alumno (Total: ${labels.length})`;
+                    break;
+                case 'eventsOverTime':
+                    const eTime = calculateEventsOverTimeData(filteredDataForCharts, sDateModal, eDateModal);
+                    labels = eTime.labels;
+                    datasets = [{ label: 'Eventos por Día', data: eTime.dataValues, borderColor: CHART_COLORS[1], fill: false, tension: 0.1, borderWidth: 2 }];
+                    chartConfigType = 'line';
+                    chartOptions.scales = { x: { type: 'time', time: { unit: 'day', tooltipFormat: 'PPPp', displayFormats: { day: 'dd/MM/yy' }}}, y: {beginAtZero: true} };
+                    titleForChart = 'Eventos por Día';
+                    break;
+                case 'componentActivity':
+                    const cActivity = calculateComponentActivityData(
+                        filteredDataForCharts, 
+                        topNModalDefault,
+                        includeZeroActivity,
+                        includeZeroActivity ? globallyProcessedDataForBaseLists : []
+                    );
+                    labels = cActivity.labels;
+                    datasets = [{ label: 'Eventos por Componente', data: cActivity.dataValues, backgroundColor: getChartColors(labels.length) }];
+                    chartConfigType = 'doughnut';
+                    titleForChart = `Actividad por Componente (Total: ${labels.length})`;
+                    break;
+                case 'activityByHour':
+                    const byHour = calculateActivityByHourData(filteredDataForCharts);
+                    labels = byHour.labels;
+                    datasets = [{ label: 'Eventos por Hora', data: byHour.dataValues, backgroundColor: CHART_COLORS[2] }];
+                    chartConfigType = 'bar';
+                    titleForChart = 'Eventos por Hora del Día';
+                    break;
+                case 'activityByDayOfWeek':
+                    const byDay = calculateActivityByDayOfWeekData(filteredDataForCharts);
+                    labels = byDay.labels;
+                    datasets = [{ label: 'Eventos por Día de Semana', data: byDay.dataValues, backgroundColor: CHART_COLORS[3] }];
+                    chartConfigType = 'bar';
+                    titleForChart = 'Eventos por Día de la Semana';
+                    break;
+                case 'componentBreakdown':
+                    const breakdown = calculateComponentBreakdownData(filteredDataForCharts, topNCompModal, topNEventsModal);
+                    labels = breakdown.labels;
+                    datasets = breakdown.datasets;
+                    datasets.forEach((ds, index) => { ds.backgroundColor = CHART_COLORS[index % CHART_COLORS.length]; });
+                    chartConfigType = 'bar';
+                    chartOptions.scales = { x: { stacked: false }, y: { stacked: false, beginAtZero: true } };
+                    titleForChart = `Desglose de Eventos (Top ${topNEventsModal}) en Componentes Principales (Top ${topNCompModal})`;
+                    break;
+                case 'activityByContext':
+                    const byContext = calculateActivityByContextData(
+                        filteredDataForCharts,      
+                        0,                          
+                        includeZeroActivity,        
+                        includeZeroActivity ? globallyProcessedDataForBaseLists : [] 
+                    );                                                                
+                                        
+                    labels = byContext.labels;
+                    datasets = [{ label: 'Eventos por Contexto', data: byContext.dataValues, backgroundColor: getChartColors(labels.length) }];
+                    chartConfigType = 'bar';
+                    chartOptions.indexAxis = 'y';
+                    chartOptions.scales = { y: { ticks: { autoSkip: false } } };
+                    titleForChart = includeZeroActivity ? 
+                                    `Actividad por Contexto (Todos base, Total: ${labels.length})` :
+                                    `Actividad por Contexto (Con actividad, Total: ${labels.length})`;
+                    break;
+                case 'scatterUsersEventsDay':
+                    calculatedData = calculateScatterUsersEventsDayData(filteredDataForCharts);
+                    datasets = [{ label: 'Días', data: calculatedData, backgroundColor: CHART_COLORS[4] }];
+                    chartConfigType = 'scatter';
+                    chartOptions.scales = { x: { title: { display: true, text: 'Usuarios Únicos' } }, y: { title: { display: true, text: 'Total Eventos' } } };
+                    chartOptions.plugins = { tooltip: scatterTooltipCallbacks('Usr. Únicos', 'Total Evt.') };
+                    titleForChart = 'Dispersión: Usuarios Únicos vs Eventos Totales (por Día)';
+                    break;
+                case 'scatterComponentsEventsUser':
+                    calculatedData = calculateScatterComponentsEventsUserData(filteredDataForCharts);
+                    datasets = [{ label: 'Alumnos', data: calculatedData, backgroundColor: CHART_COLORS[5] }];
+                    chartConfigType = 'scatter';
+                    chartOptions.scales = { x: { title: { display: true, text: 'Componentes Únicos Accedidos' } }, y: { title: { display: true, text: 'Total Eventos' } } };
+                    chartOptions.plugins = { tooltip: scatterTooltipCallbacks('Comp. Únicos', 'Total Evt.') };
+                    titleForChart = 'Dispersión: Componentes Únicos vs Eventos Totales (por Alumno)';
+                    break;
+                case 'scatterContentViewParticipation':
+                    calculatedData = calculateScatterContentViewParticipationData(filteredDataForCharts);
+                    datasets = [{ label: 'Alumnos', data: calculatedData, backgroundColor: CHART_COLORS[6] }];
+                    chartConfigType = 'scatter';
+                    chartOptions.scales = { x: { title: { display: true, text: 'Nº Eventos Visualización' } }, y: { title: { display: true, text: 'Nº Eventos Participación' } } };
+                    chartOptions.plugins = { tooltip: scatterTooltipCallbacks('Evt. Visual.', 'Evt. Particip.') };
+                    titleForChart = 'Dispersión: Eventos de Visualización vs Participación (por Alumno)';
+                    break;
+                case 'bubbleStudentAnalysis':
+                    calculatedData = calculateBubbleStudentAnalysisData(filteredDataForCharts);
+                    datasets = [{ label: 'Alumnos', data: calculatedData, backgroundColor: CHART_COLORS[0] }];
+                    chartConfigType = 'bubble';
+                    chartOptions.scales = { x: { title: { display: true, text: 'Número de Días Activos' } }, y: { title: { display: true, text: 'Promedio Eventos por Día Activo' } } };
+                    chartOptions.plugins = { tooltip: bubbleTooltipCallbacks('Días Act.', 'Ø Evt/Día', 'Total Evt.') };
+                    titleForChart = 'Burbujas: Análisis de Alumnos';
+                    break;
+                case 'bubbleComponentAnalysis':
+                    calculatedData = calculateBubbleComponentAnalysisData(filteredDataForCharts);
+                    datasets = [{ label: 'Componentes', data: calculatedData, backgroundColor: CHART_COLORS[1] }];
+                    chartConfigType = 'bubble';
+                    chartOptions.scales = { x: { title: { display: true, text: 'Nº Usuarios Únicos' } }, y: { title: { display: true, text: 'Nº Total Eventos' } } };
+                    chartOptions.plugins = { tooltip: bubbleTooltipCallbacks('Usr. Únicos', 'Total Evt.', 'Ø Evt/Usr') };
+                    titleForChart = 'Burbujas: Análisis de Componentes';
+                    break;
+                case 'bubbleContextAnalysis':
+                    calculatedData = calculateBubbleContextAnalysisData(filteredDataForCharts);
+                    datasets = [{ label: 'Contextos', data: calculatedData, backgroundColor: CHART_COLORS[2] }];
+                    chartConfigType = 'bubble';
+                    chartOptions.scales = { x: { title: { display: true, text: 'Nº Alumnos Activos' } }, y: { title: { display: true, text: 'Nº Promedio Eventos por Alumno' } } };
+                    chartOptions.plugins = { tooltip: bubbleTooltipCallbacks('Alu. Activos', 'Ø Evt/Alu.', 'Total Evt.') };
+                    titleForChart = 'Burbujas: Análisis de Contextos';
+                    break;
+                case 'topIPsByEvents':
+                    const ipEvents = calculateTopIPsByEventsData(
+                        filteredDataForCharts, 
+                        topNModalDefault,
+                        includeZeroActivity,
+                        includeZeroActivity ? globallyProcessedDataForBaseLists : []
+                    );
+                    labels = ipEvents.labels;
+                    datasets = [{ label: 'Eventos por IP', data: ipEvents.dataValues, backgroundColor: getChartColors(labels.length) }];
+                    chartConfigType = 'bar';
+                    chartOptions.indexAxis = 'y';
+                    chartOptions.scales = { y: { ticks: { autoSkip: false } } };
+                    titleForChart = `Top IPs por Número de Eventos (Total: ${labels.length})`;
+                    break;
+                case 'usersPerIP':
+                    const usersIP = calculateUsersPerIPData(
+                        filteredDataForCharts, 
+                        topNModalDefault,
+                        includeZeroActivity,
+                        includeZeroActivity ? globallyProcessedDataForBaseLists : []
+                    );
+                    labels = usersIP.labels;
+                    datasets = [{ label: 'Alumnos Únicos por IP', data: usersIP.dataValues, backgroundColor: getChartColors(labels.length) }];
+                    chartConfigType = 'bar';
+                    chartOptions.indexAxis = 'y';
+                    chartOptions.scales = { y: { ticks: { autoSkip: false } } };
+                    titleForChart = `Top IPs por Número de Alumnos Únicos (Total: ${labels.length})`;
+                    break;
+                case 'ipsPerUser':
+                    const ipsUser = calculateIPsPerUserData(
+                        filteredDataForCharts, 
+                        topNModalDefault,
+                        includeZeroActivity,
+                        includeZeroActivity ? globallyProcessedDataForBaseLists : []
+                    );
+                    labels = ipsUser.labels;
+                    datasets = [{ label: 'IPs Únicas por Alumno', data: ipsUser.dataValues, backgroundColor: getChartColors(labels.length) }];
+                    chartConfigType = 'bar';
+                    chartOptions.indexAxis = 'y';
+                    chartOptions.scales = { y: { ticks: { autoSkip: false } } };
+                    titleForChart = `Top Alumnos por Número de IPs Únicas (Total: ${labels.length})`;
+                    break;
+                default:
+                    console.error("Tipo de gráfico desconocido para modal:", type);
+                    return;
+            }
+            
+            chartOptions.plugins = {
+                ...(chartOptions.plugins || {}), 
+                title: { display: true, text: titleForChart, font: { size: 16 } },
+                legend: { display: chartConfigType === 'doughnut' || (datasets.length > 1 && datasets.length <= 10 && chartConfigType !== 'scatter' && chartConfigType !== 'bubble') }
+            };
+            
+            let finalChartData;
+            if (chartConfigType === 'scatter' || chartConfigType === 'bubble') {
+                finalChartData = { datasets: datasets };
+            } else {
+                finalChartData = { labels: labels, datasets: datasets };
+            }
+
+            let hasDataForChart = false;
+            if (chartConfigType === 'scatter' || chartConfigType === 'bubble') {
+                hasDataForChart = datasets.some(ds => ds.data && ds.data.length > 0);
+            } else {
+                let hasLabelsForChart = finalChartData.labels && finalChartData.labels.length > 0;
+                let hasDataInDatasetsForChart = finalChartData.datasets && finalChartData.datasets.some(ds => ds.data && ds.data.length > 0);
+                let allDataValuesAreZeroInDatasetsForChart = finalChartData.datasets && finalChartData.datasets.every(ds => ds.data && ds.data.every(val => val === 0));
+                
+                if (isRankingChartType && includeZeroActivity && hasLabelsForChart) {
+                    hasDataForChart = true; 
+                } else if (hasLabelsForChart && hasDataInDatasetsForChart) {
+                    if ((chartConfigType === 'doughnut' || chartConfigType === 'pie') && allDataValuesAreZeroInDatasetsForChart && !(isRankingChartType && includeZeroActivity)) {
+                         hasDataForChart = false;
+                    } else {
+                        hasDataForChart = true;
+                    }
+                }
+            }
+            
+            if (hasDataForChart) { 
+                 modalChartInstance = new Chart(ctx, {
+                    type: chartConfigType,
+                    data: finalChartData,
+                    options: chartOptions
+                });
+                if(modalChartInstance) { // Store instance on canvas for CSV download
+                    canvas._chartjs = modalChartInstance;
+                }
+            } else { 
+                 ctx.save();
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = "16px " + Chart.defaults.font.family;
+                ctx.fillStyle = "#6c757d";
+                ctx.fillText("No hay datos para este gráfico con los filtros actuales.", canvas.width / 2, canvas.height / 2);
+                ctx.restore();
+            }
+        }
+
+        function renderLogTable(data) {
+            logTableBody.innerHTML = ''; 
+            tableRowCountEl.textContent = '';
+
+            if (data.length === 0) {
+                logTableBody.innerHTML = '<tr><td colspan="6" class="text-center">No hay datos para mostrar.</td></tr>';
+                tableRowCountEl.textContent = `Mostrando 0 filas.`;
+                return;
+            }
+            
+            const fragment = document.createDocumentFragment();
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row.TIME || ''}</td>
+                    <td>${row.FULL_NAME || ''}</td>
+                    <td>${row.EVENT_CONTEXT || ''}</td>
+                    <td>${row.COMPONENT || ''}</td>
+                    <td>${row.EVENT_NAME || ''}</td>
+                    <td>${row.DESCRIPTION || ''}</td>
+                `;
+                fragment.appendChild(tr);
+            });
+            logTableBody.appendChild(fragment);
+            tableRowCountEl.textContent = `Mostrando ${data.length} fila(s).`;
+        }
+
+        function showUserMessage(message, type = 'info') { 
+            statusMessage.textContent = message;
+            statusMessage.className = `mt-3 pt-2 border-top text-${type}`;
+        }
+
+        function handleDownloadLogsCsv() {
+            if (!filteredDataForCharts || filteredDataForCharts.length === 0) {
+                showUserMessage("No hay logs filtrados para descargar.", "warning");
+                return;
+            }
+
+            const headers = [
+                CSV_COLUMN_MAPPING.TIME,
+                CSV_COLUMN_MAPPING.FULL_NAME,
+                CSV_COLUMN_MAPPING.EVENT_CONTEXT,
+                CSV_COLUMN_MAPPING.COMPONENT,
+                CSV_COLUMN_MAPPING.EVENT_NAME,
+                CSV_COLUMN_MAPPING.DESCRIPTION
+            ];
+            
+            const dataForCsv = filteredDataForCharts.map(row => [
+                row.TIME || '',
+                row.FULL_NAME || '',
+                row.EVENT_CONTEXT || '',
+                row.COMPONENT || '',
+                row.EVENT_NAME || '',
+                row.DESCRIPTION || ''
+            ]);
+
+            const csvContent = convertToCSV(dataForCsv, headers);
+            const filename = generateDynamicFilename('moodle_logs_filtrados', 'logs');
+            downloadCSV(csvContent, filename);
+            showUserMessage(`Logs descargados como ${filename}`, "success");
+        }
+
+        function handleDownloadChartCsv(chartInstance, chartType, modalId) {
+            if (!chartInstance || !chartInstance.data) {
+                showUserMessage("No hay datos en el gráfico para descargar.", "warning");
+                return;
+            }
+
+            const chartData = chartInstance.data;
+            let csvFormattedData = [];
+            let csvHeaders = [];
+            let baseFilename = chartType || 'chart_data';
+
+            if (chartInstance.options?.plugins?.title?.text) {
+                baseFilename = chartInstance.options.plugins.title.text;
+            }
+            
+            switch (chartType) {
+                case 'userActivity':
+                case 'componentActivity':
+                case 'activityByHour':
+                case 'activityByDayOfWeek':
+                case 'activityByContext':
+                case 'topIPsByEvents':
+                case 'usersPerIP':
+                case 'ipsPerUser':
+                    csvHeaders = ['Etiqueta', chartData.datasets[0].label || 'Valor'];
+                    if (chartData.labels && chartData.labels.length > 0 && chartData.datasets[0].data.length > 0) {
+                        csvFormattedData = chartData.labels.map((label, index) => ({
+                            'Etiqueta': label,
+                            [csvHeaders[1]]: chartData.datasets[0].data[index]
+                        }));
+                    }
+                    break;
+                
+                case 'eventsOverTime':
+                    csvHeaders = ['Fecha', chartData.datasets[0].label || 'Eventos'];
+                     if (chartData.labels && chartData.labels.length > 0 && chartData.datasets[0].data.length > 0) {
+                        csvFormattedData = chartData.labels.map((label, index) => {
+                            const dateLabel = new Date(label).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) + " " + new Date(label).toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+                            return {
+                                'Fecha': dateLabel,
+                                [csvHeaders[1]]: chartData.datasets[0].data[index]
+                            };
+                        });
+                    }
+                    break;
+
+                case 'componentBreakdown':
+                    if (chartData.labels && chartData.labels.length > 0) {
+                        csvHeaders = ['Componente', ...chartData.datasets.map(ds => ds.label || `Serie ${chartData.datasets.indexOf(ds) + 1}`)];
+                        csvFormattedData = chartData.labels.map((label, index) => {
+                            const row = { 'Componente': label };
+                            chartData.datasets.forEach((ds, dsIndex) => {
+                                row[csvHeaders[dsIndex+1]] = ds.data[index];
+                            });
+                            return row;
+                        });
+                    }
+                    break;
+
+                case 'scatterUsersEventsDay':
+                case 'scatterComponentsEventsUser':
+                case 'scatterContentViewParticipation':
+                    const xAxisLabel = chartInstance.options?.scales?.x?.title?.text || 'X';
+                    const yAxisLabel = chartInstance.options?.scales?.y?.title?.text || 'Y';
+                    csvHeaders = ['Elemento', xAxisLabel, yAxisLabel];
+                    if (chartData.datasets[0] && chartData.datasets[0].data.length > 0) {
+                        csvFormattedData = chartData.datasets[0].data.map(point => ({
+                            'Elemento': point.label || `Punto (${point.x}, ${point.y})`,
+                            [xAxisLabel]: point.x,
+                            [yAxisLabel]: point.y
+                        }));
+                    }
+                    break;
+
+                case 'bubbleStudentAnalysis':
+                case 'bubbleComponentAnalysis':
+                case 'bubbleContextAnalysis':
+                    const xBubbleLabel = chartInstance.options?.scales?.x?.title?.text || 'X';
+                    const yBubbleLabel = chartInstance.options?.scales?.y?.title?.text || 'Y';
+                    let rBubbleLabel = 'Tamaño_Burbuja_Valor_Bruto'; // Default, will try to get from tooltip config if complex
+
+                    // Attempt to get R-label from tooltip if available, otherwise default
+                    const tooltipCallbacks = chartInstance.options?.plugins?.tooltip?.callbacks;
+                    if (tooltipCallbacks && typeof tooltipCallbacks.label === 'function') {
+                        // This is tricky, as we don't have a 'context' here.
+                        // We'll use a simplified approach or stick to a known convention for _rawR's label
+                        const samplePoint = chartData.datasets[0].data[0];
+                        if (samplePoint && samplePoint.label && samplePoint._rawR !== undefined) {
+                             // Try to infer R label from a sample tooltip string if possible (complex)
+                             // For simplicity, we'll use the default for now or a pre-defined one in bubbleTooltipCallbacks
+                             // Example: if bubbleTooltipCallbacks adds "Total Evt.: X", then rLabel is "Total Evt."
+                             // This requires coordination with how tooltips are defined.
+                             // For now, assume we store the R label in the tooltip options or use a generic one.
+                             // For demo, let's hardcode, but this could be improved by storing it in point._rLabel or chart options
+                            if(chartType === 'bubbleStudentAnalysis') rBubbleLabel = 'Total_Eventos';
+                            else if(chartType === 'bubbleComponentAnalysis') rBubbleLabel = 'Promedio_Eventos_Usuario';
+                            else if(chartType === 'bubbleContextAnalysis') rBubbleLabel = 'Total_Eventos_Contexto';
+                        }
+                    }
+                    
+                    csvHeaders = ['Elemento', xBubbleLabel, yBubbleLabel, rBubbleLabel];
+                    if (chartData.datasets[0] && chartData.datasets[0].data.length > 0) {
+                         csvFormattedData = chartData.datasets[0].data.map(point => ({
+                            'Elemento': point.label || `Burbuja (${point.x}, ${point.y})`,
+                            [xBubbleLabel]: point.x,
+                            [yBubbleLabel]: point.y,
+                            [rBubbleLabel]: point._rawR !== undefined ? point._rawR : point.r
+                        }));
+                    }
+                    break;
+
+                default:
+                    showUserMessage(`Descarga CSV no implementada para el tipo de gráfico: ${chartType}`, "warning");
+                    return;
+            }
+
+            if (csvFormattedData.length === 0) {
+                 // Check if there are labels but all data values are zero (due to includeZeroActivity)
+                let allZeros = false;
+                if (chartData.labels && chartData.labels.length > 0 && chartData.datasets[0] && chartData.datasets[0].data) {
+                   allZeros = chartData.datasets[0].data.every(val => val === 0);
+                }
+
+                if (includeZeroActivity && allZeros && chartType !== 'scatterUsersEventsDay' && chartType !== 'scatterComponentsEventsUser' && chartType !== 'scatterContentViewParticipation' && !chartType.startsWith('bubble')) {
+                    // If includeZeroActivity is true and we have labels with all zero data, we still want to export them
+                    // (excluding scatter/bubble charts where "zero" is less meaningful for all points)
+                    // Re-populate csvFormattedData if it was cleared due to no "positive" data
+                     if (chartData.labels && chartData.labels.length > 0 && chartData.datasets[0].data.length > 0) {
+                        csvFormattedData = chartData.labels.map((label, index) => ({
+                            'Etiqueta': label,
+                            [csvHeaders[1]]: chartData.datasets[0].data[index] // This will be 0
+                        }));
+                    } else {
+                        showUserMessage("No hay datos procesados para este gráfico.", "info");
+                        return;
+                    }
+                } else {
+                    showUserMessage("No hay datos procesados para este gráfico.", "info");
+                    return;
+                }
+            }
+            
+            const csvContent = convertToCSV(csvFormattedData, csvHeaders); 
+            const filename = generateDynamicFilename(baseFilename, 'grafico');
+            downloadCSV(csvContent, filename);
+            showUserMessage(`Datos del gráfico descargados como ${filename}`, "success");
+        }
+
+    </script>
+</body>
+</html>
