@@ -358,6 +358,32 @@ function downloadHtml() {
     const htmlAttributes = isDark ? `data-bs-theme="dark"` : '';
     const bodyClass = `generated-html-body`;
 
+    const sidebarToggleJs = `
+    // --- Sidebar toggle ---
+    (function() {
+        var toggleBtn = document.getElementById('sidebarToggleBtn');
+        var sidebarCol = document.getElementById('sidebarCol');
+        var mainCol = document.getElementById('mainCol');
+        if (!toggleBtn || !sidebarCol || !mainCol) return;
+        var STORAGE_KEY = 'sidebar-collapsed';
+        var saved = localStorage.getItem(STORAGE_KEY);
+        var startCollapsed = saved !== null ? saved === '1' : false;
+        function apply(collapsed) {
+            sidebarCol.classList.toggle('collapsed', collapsed);
+            if (collapsed) { mainCol.className = 'col-12'; toggleBtn.classList.add('floating'); toggleBtn.title = 'Mostrar índice'; }
+            else { mainCol.className = 'col-md-8 col-lg-9'; toggleBtn.classList.remove('floating'); toggleBtn.title = 'Ocultar índice'; }
+        }
+        apply(startCollapsed);
+        toggleBtn.addEventListener('click', function() {
+            var isCollapsed = sidebarCol.classList.contains('collapsed');
+            var newState = !isCollapsed;
+            apply(newState);
+            localStorage.setItem(STORAGE_KEY, newState ? '1' : '0');
+        });
+    })();`;
+
+    const sidebarToggleSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M14 2a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM2 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2z"/><path d="M3 4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></svg>`;
+
     const htmlContent = `<!DOCTYPE html>
 <html lang="es" ${htmlAttributes}>
 <head>
@@ -370,16 +396,17 @@ function downloadHtml() {
 ${cssToEmbed}
     </style>
 </head>
-<body class="${bodyClass}" data-bs-spy="scroll" data-bs-target="#indiceContenido" data-bs-offset="${SCROLL_OFFSET_DOWNLOAD + 10}">
+<body class="${bodyClass}" data-bs-spy="scroll" data-bs-target="#indiceContenido" data-bs-offset="${SCROLL_OFFSET_DOWNLOAD + 10}" style="position:relative;">
     <div class="container-fluid mt-4">
+        <button id="sidebarToggleBtn" class="sidebar-toggle-btn" type="button" title="Mostrar/ocultar índice" aria-label="Mostrar/ocultar índice">${sidebarToggleSvg}</button>
         <div class="row">
-            <div class="col-md-4 col-lg-3 d-none d-md-block">
+            <div id="sidebarCol" class="col-md-4 col-lg-3 sidebar-col">
                 <nav id="indiceContenido">
                     <h5 class="mb-3">Índice</h5>
                     ${tempTocNav.outerHTML}
                 </nav>
             </div>
-            <div class="col-md-8 col-lg-9">
+            <div id="mainCol" class="col-md-8 col-lg-9">
                 <main id="mainContent">
                     ${tempContent.innerHTML}
                 </main>
@@ -391,6 +418,7 @@ ${cssToEmbed}
 // Embedded JS
 ${addCopyButtonsFuncStringForDownload}
 ${jsToEmbed}
+${sidebarToggleJs}
     <\/script>
 </body>
 </html>`;
@@ -473,6 +501,47 @@ Puedes usar **Markdown** aquí dentro.
         }
         // --- FIN CAMBIOS PARA IMÁGENES ---
 
+        // --- Sidebar toggle (preview) ---
+        function initSidebarToggle() {
+            const toggleBtn = document.getElementById('sidebarToggleBtnPreview');
+            const sidebarCol = document.getElementById('sidebarColPreview');
+            const mainCol = document.getElementById('mainColPreview');
+            if (!toggleBtn || !sidebarCol || !mainCol) return;
+
+            const STORAGE_KEY = 'sidebar-collapsed';
+            const saved = localStorage.getItem(STORAGE_KEY);
+            // Default: collapsed en pantallas grandes para peso visual bajo
+            const startCollapsed = saved !== null ? saved === '1' : false;
+
+            function applySidebarState(collapsed) {
+                sidebarCol.classList.toggle('collapsed', collapsed);
+                if (collapsed) {
+                    mainCol.className = 'col-12';
+                    toggleBtn.classList.add('floating');
+                    toggleBtn.title = 'Mostrar índice';
+                } else {
+                    mainCol.className = 'col-md-8 col-lg-9';
+                    toggleBtn.classList.remove('floating');
+                    toggleBtn.title = 'Ocultar índice';
+                }
+            }
+
+            applySidebarState(startCollapsed);
+
+            toggleBtn.addEventListener('click', () => {
+                const isCollapsed = sidebarCol.classList.contains('collapsed');
+                const newState = !isCollapsed;
+                applySidebarState(newState);
+                localStorage.setItem(STORAGE_KEY, newState ? '1' : '0');
+                // Refresh ScrollSpy after transition
+                setTimeout(() => {
+                    if (scrollSpyInstance) {
+                        scrollSpyInstance.refresh();
+                    }
+                }, 350);
+            });
+        }
+
         function initializeApp() {
             themes.forEach((theme, index) => { const option = document.createElement('option'); option.value = index; option.textContent = theme.name; themeSelector.appendChild(option); });
             personalizationInputs.forEach(input => {
@@ -499,6 +568,7 @@ Puedes usar **Markdown** aquí dentro.
             
             applyTheme(0);
             themeSelector.value = "0";
+            initSidebarToggle();
             generateHtmlPreview();
         }
 
