@@ -70,14 +70,14 @@
         #previewSection #htmlOutputBody a, .generated-html-body a { color: var(--link-color); text-decoration: none; }
         #previewSection #htmlOutputBody a:hover, .generated-html-body a:hover { color: color-mix(in srgb, var(--link-color) 80%, black); text-decoration: underline; }
         /* --- Sidebar colapsable --- */
-        .sidebar-col { transition: width 0.3s ease, flex 0.3s ease, opacity 0.3s ease, padding 0.3s ease; overflow: hidden; }
-        .sidebar-col.collapsed { flex: 0 0 0 !important; max-width: 0 !important; padding-left: 0 !important; padding-right: 0 !important; opacity: 0; pointer-events: none; }
+        .sidebar-col { transition: width 0.3s ease, flex 0.3s ease, opacity 0.3s ease, padding 0.3s ease; overflow: visible; }
+        .sidebar-col.collapsed { flex: 0 0 0 !important; max-width: 0 !important; padding-left: 0 !important; padding-right: 0 !important; opacity: 0; pointer-events: none; overflow: hidden; }
         .sidebar-toggle-btn { position: sticky; top: 0.5rem; z-index: 10; background: var(--bg-indice, #f8f9fa); border: 1px solid #dee2e6; border-radius: 0.25rem; color: #64748b; cursor: pointer; padding: 0.25rem 0.4rem; font-size: 0.8rem; line-height: 1; opacity: 0.6; transition: opacity 0.2s ease, color 0.2s ease; display: inline-flex; align-items: center; }
         .sidebar-toggle-btn:hover { opacity: 1; color: var(--color-indice-link, #0d6efd); }
         /* Botón flotante cuando el sidebar está oculto */
         .sidebar-toggle-btn.floating { position: absolute; left: 0; top: 0.5rem; opacity: 0.5; border-radius: 0 0.25rem 0.25rem 0; pointer-events: auto; }
         .sidebar-toggle-btn.floating:hover { opacity: 1; }
-        #indiceContenidoPreview, #indiceContenido { position: sticky; top: 1rem; height: calc(100vh - 2rem); overflow-y: auto; border: 1px solid #dee2e6; border-radius: 0.375rem; padding: 0.75rem; background-color: var(--bg-indice); opacity: 0.85; font-size: 0.85rem; }
+        #indiceContenidoPreview, #indiceContenido { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; border: 1px solid #dee2e6; border-radius: 0.375rem; padding: 0.75rem; background-color: var(--bg-indice); opacity: 0.85; font-size: 0.85rem; }
         #indiceContenidoPreview h5, #indiceContenido h5 { color: var(--color-h5); }
         #indiceContenidoPreview .nav-link, #indiceContenido .nav-link { color: var(--color-indice-link); padding-top: 0.3rem; padding-bottom: 0.3rem; border-radius: 0.25rem; font-size: 0.9rem; transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: normal; }
         #indiceContenidoPreview .nav-link:hover, #indiceContenido .nav-link:hover { color: var(--color-indice-link-hover); background-color: var(--bg-indice-link-hover); }
